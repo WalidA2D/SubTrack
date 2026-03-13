@@ -1,0 +1,48 @@
+{
+  "registerRequest": {
+    "email": "sarah@subly.app",
+    "password": "StrongPass!123",
+    "displayName": "Sarah Miller"
+  },
+  "registerResponse": {
+    "user": {
+      "id": "uid_123",
+      "email": "sarah@subly.app",
+      "displayName": "Sarah Miller",
+      "planTier": "free"
+    },
+    "customToken": "eyJhbGciOi..."
+  },
+  "createSubscriptionRequest": {
+    "providerName": "Figma",
+    "categoryId": "cat_productivity",
+    "categoryName": "Productivity",
+    "price": 20,
+    "currency": "USD",
+    "billingFrequency": "monthly",
+    "nextBillingDate": "2026-03-18T00:00:00.000Z",
+    "reminderDaysBefore": 2,
+    "notes": "Design team seat"
+  },
+  "dashboardSummaryResponse": {
+    "data": {
+      "monthlySpending": 74.95,
+      "yearlyEstimate": 899.4,
+      "subscriptionCount": 6,
+      "upcomingPayments": [
+        {
+          "subscriptionId": "sub_figma_01",
+          "providerName": "Figma",
+          "amount": 20,
+          "dueDate": "2026-03-18T00:00:00.000Z"
+        }
+      ],
+      "insights": [
+        {
+          "type": "duplicate_subscription",
+          "message": "You have 2 active Google One plans."
+        }
+      ]
+    }
+  }
+}

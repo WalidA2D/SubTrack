@@ -1,0 +1,81 @@
+{
+  "users": {
+    "id": "uid_123",
+    "email": "sarah@subly.app",
+    "displayName": "Sarah Miller",
+    "photoUrl": null,
+    "planTier": "free",
+    "currency": "USD",
+    "notificationPreferences": {
+      "paymentReminders": true,
+      "trialReminders": true,
+      "insightNotifications": true,
+      "defaultReminderDaysBefore": 3
+    },
+    "activeSubscriptionCount": 4,
+    "fcmTokens": [
+      "fcm_token_1"
+    ],
+    "createdAt": "2026-03-13T10:00:00.000Z",
+    "updatedAt": "2026-03-13T10:00:00.000Z"
+  },
+  "subscriptions": {
+    "id": "sub_netflix_01",
+    "userId": "uid_123",
+    "providerName": "Netflix",
+    "normalizedProviderName": "netflix",
+    "categoryId": "cat_entertainment",
+    "categoryName": "Entertainment",
+    "price": 15.99,
+    "currency": "USD",
+    "billingFrequency": "monthly",
+    "priceMonthly": 15.99,
+    "priceYearly": 191.88,
+    "nextBillingDate": "2026-03-21T00:00:00.000Z",
+    "reminderDaysBefore": 3,
+    "status": "active",
+    "notes": "Shared family plan",
+    "trialEndsAt": null,
+    "lastUsedAt": "2026-03-01T00:00:00.000Z",
+    "usageCheckIn": "active",
+    "createdAt": "2026-02-01T00:00:00.000Z",
+    "updatedAt": "2026-03-13T10:00:00.000Z",
+    "archivedAt": null
+  },
+  "payments": {
+    "id": "pay_netflix_2026_03",
+    "userId": "uid_123",
+    "subscriptionId": "sub_netflix_01",
+    "providerName": "Netflix",
+    "amount": 15.99,
+    "currency": "USD",
+    "status": "paid",
+    "billingPeriodStart": "2026-02-21T00:00:00.000Z",
+    "billingPeriodEnd": "2026-03-21T00:00:00.000Z",
+    "chargedAt": "2026-03-21T00:00:00.000Z",
+    "createdAt": "2026-03-21T00:01:00.000Z"
+  },
+  "notifications": {
+    "id": "notif_01",
+    "userId": "uid_123",
+    "subscriptionId": "sub_netflix_01",
+    "type": "payment_due",
+    "title": "Netflix renews in 3 days",
+    "body": "Your Netflix subscription will charge $15.99 on March 21.",
+    "scheduledFor": "2026-03-18T09:00:00.000Z",
+    "status": "scheduled",
+    "channels": [
+      "push"
+    ],
+    "createdAt": "2026-03-13T10:05:00.000Z"
+  },
+  "categories": {
+    "id": "cat_entertainment",
+    "userId": "system",
+    "name": "Entertainment",
+    "icon": "play-circle",
+    "color": "#6366F1",
+    "isDefault": true,
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  }
+}

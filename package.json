@@ -1,0 +1,27 @@
+{
+  "name": "subly",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Subly monorepo: mobile app, Firebase backend, shared contracts, and product blueprint.",
+  "workspaces": [
+    "apps/*",
+    "functions",
+    "packages/*"
+  ],
+  "scripts": {
+    "setup:local": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-local.ps1",
+    "mobile": "npm --workspace @subly/mobile run start",
+    "android": "npm --workspace @subly/mobile run android",
+    "ios": "npm --workspace @subly/mobile run ios",
+    "mobile:typecheck": "npm --workspace @subly/mobile run typecheck",
+    "functions:build": "npm --workspace @subly/functions run build",
+    "functions:serve": "npm --workspace @subly/functions run serve",
+    "shared:build": "npm --workspace @subly/shared run build",
+    "build": "npm run shared:build && npm run functions:build",
+    "lint": "npm run lint -ws",
+    "typecheck": "npm run typecheck -ws"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
