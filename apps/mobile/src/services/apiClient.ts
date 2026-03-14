@@ -1,14 +1,40 @@
-import auth from "@react-native-firebase/auth";
-
 import { appConfig } from "../config/appConfig";
+import { useAuthStore } from "../store/authStore";
 
-async function getAuthHeaders() {
-  const idToken = await auth().currentUser?.getIdToken();
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (appConfig.authMode === "mock") {
+    const session = useAuthStore.getState().session;
+
+    return {
+      "Content-Type": "application/json",
+      "X-Subly-Mock-User": session?.uid ?? "mock-user-id",
+      "X-Subly-Mock-Email": session?.email ?? "demo@subly.app",
+      "X-Subly-Mock-Name": session?.displayName ?? "Utilisateur Subly"
+    };
+  }
+
+  const { firebaseAuth } = await import("../config/firebase");
+  const idToken = await firebaseAuth.currentUser?.getIdToken();
 
   return {
     "Content-Type": "application/json",
     ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
   };
+}
+
+function buildHeaders(
+  baseHeaders: Record<string, string>,
+  additionalHeaders?: HeadersInit
+): Headers {
+  const headers = new Headers(baseHeaders);
+
+  if (additionalHeaders) {
+    new Headers(additionalHeaders).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
+  return headers;
 }
 
 export async function apiRequest<T>(
@@ -17,10 +43,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
     ...options,
-    headers: {
-      ...(await getAuthHeaders()),
-      ...(options.headers ?? {})
-    }
+    headers: buildHeaders(await getAuthHeaders(), options.headers)
   });
 
   if (!response.ok) {

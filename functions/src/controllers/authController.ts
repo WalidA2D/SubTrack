@@ -27,7 +27,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     displayName: payload.displayName,
     photoUrl: null,
     planTier: "free",
-    currency: "USD",
+    currency: "EUR",
     notificationPreferences: {
       paymentReminders: true,
       trialReminders: true,
@@ -55,7 +55,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const payload = loginRequestSchema.parse(req.body);
-  const apiKey = requireEnv("FIREBASE_WEB_API_KEY");
+  const apiKey = requireEnv("AUTH_WEB_API_KEY");
 
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -83,7 +83,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   };
 
   if (!response.ok || !data.localId || !data.idToken || !data.refreshToken || !data.expiresIn) {
-    throw new ApiError(401, data.error?.message ?? "Invalid email or password.");
+    throw new ApiError(401, data.error?.message ?? "Email ou mot de passe invalide.");
   }
 
   const userSnapshot = await db.collection("users").doc(data.localId).get();
@@ -96,7 +96,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     user: {
       id: data.localId,
       email: data.email ?? payload.email,
-      displayName: profile?.displayName ?? data.displayName ?? "Subly User",
+      displayName: profile?.displayName ?? data.displayName ?? "Utilisateur Subly",
       planTier: profile?.planTier ?? "free"
     }
   });
@@ -104,7 +104,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
 export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
   const payload = resetPasswordRequestSchema.parse(req.body);
-  const apiKey = requireEnv("FIREBASE_WEB_API_KEY");
+  const apiKey = requireEnv("AUTH_WEB_API_KEY");
 
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
@@ -121,10 +121,10 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   );
 
   if (!response.ok) {
-    throw new ApiError(400, "Unable to send password reset email.");
+    throw new ApiError(400, "Impossible d'envoyer l'email de reinitialisation.");
   }
 
   res.json({
-    message: "Password reset email sent."
+    message: "Email de reinitialisation envoye."
   });
 });

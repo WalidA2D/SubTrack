@@ -3,6 +3,7 @@ import {
   FieldValue
 } from "firebase-admin/firestore";
 import {
+  findCategoryPresetByName,
   FREE_PLAN_MAX_SUBSCRIPTIONS,
   Subscription,
   SubscriptionInput,
@@ -20,6 +21,7 @@ import { buildInsights } from "./insightService";
 const subscriptionsCollection = db.collection("subscriptions");
 const usersCollection = db.collection("users");
 const paymentsCollection = db.collection("payments");
+const categoriesCollection = db.collection("categories");
 
 function countsTowardLimit(status: Subscription["status"]): boolean {
   return status === "active" || status === "trial";
@@ -38,7 +40,7 @@ async function ensureCanCreateSubscription(userId: string) {
   const userSnapshot = await usersCollection.doc(userId).get();
 
   if (!userSnapshot.exists) {
-    throw new ApiError(404, "User profile not found.");
+    throw new ApiError(404, "Profil utilisateur introuvable.");
   }
 
   const profile = userSnapshot.data() as {
@@ -51,7 +53,7 @@ async function ensureCanCreateSubscription(userId: string) {
   if ((profile.planTier ?? "free") === "free" && activeCount >= FREE_PLAN_MAX_SUBSCRIPTIONS) {
     throw new ApiError(
       403,
-      "Free plan limit reached. Upgrade to premium for unlimited subscriptions."
+      `La limite du plan gratuit (${FREE_PLAN_MAX_SUBSCRIPTIONS} abonnements) est atteinte. Passe au Premium pour des abonnements illimites.`
     );
   }
 }
@@ -76,7 +78,7 @@ function buildSubscriptionRecord(
     categoryId: payload.categoryId ?? existing?.categoryId ?? "",
     categoryName: payload.categoryName ?? existing?.categoryName ?? "",
     price,
-    currency: payload.currency ?? existing?.currency ?? "USD",
+    currency: payload.currency ?? existing?.currency ?? "EUR",
     billingFrequency,
     priceMonthly: toMonthlyAmount(price, billingFrequency),
     priceYearly: toYearlyAmount(price, billingFrequency),
@@ -111,10 +113,36 @@ async function getSubscriptionOrThrow(subscriptionId: string): Promise<Subscript
   const snapshot = await subscriptionsCollection.doc(subscriptionId).get();
 
   if (!snapshot.exists) {
-    throw new ApiError(404, "Subscription not found.");
+    throw new ApiError(404, "Abonnement introuvable.");
   }
 
-  return mapSubscription(snapshot.data());
+  return mapSubscription(snapshot.data()!);
+}
+
+async function ensureCategoryDocument(
+  userId: string,
+  categoryId: string,
+  categoryName: string
+): Promise<void> {
+  const categoryReference = categoriesCollection.doc(categoryId);
+  const snapshot = await categoryReference.get();
+
+  if (snapshot.exists) {
+    return;
+  }
+
+  const preset = findCategoryPresetByName(categoryName);
+  const now = new Date().toISOString();
+
+  await categoryReference.set({
+    id: categoryId,
+    userId,
+    name: categoryName,
+    icon: preset?.icon ?? "square",
+    color: preset?.color ?? "#8C7BFF",
+    isDefault: Boolean(preset),
+    createdAt: now
+  });
 }
 
 export const subscriptionService = {
@@ -169,6 +197,7 @@ export const subscriptionService = {
       await ensureCanCreateSubscription(userId);
     }
 
+    await ensureCategoryDocument(userId, subscription.categoryId, subscription.categoryName);
     await subscriptionsCollection.doc(subscription.id).set(subscription);
 
     if (countsTowardLimit(subscription.status)) {
@@ -186,7 +215,7 @@ export const subscriptionService = {
     const existing = await getSubscriptionOrThrow(subscriptionId);
 
     if (existing.userId !== userId) {
-      throw new ApiError(403, "You do not have access to this subscription.");
+      throw new ApiError(403, "Tu n'as pas acces a cet abonnement.");
     }
 
     const updated = buildSubscriptionRecord(userId, payload as SubscriptionInput, existing);
@@ -197,6 +226,7 @@ export const subscriptionService = {
       await ensureCanCreateSubscription(userId);
     }
 
+    await ensureCategoryDocument(userId, updated.categoryId, updated.categoryName);
     await subscriptionsCollection.doc(subscriptionId).set(updated, { merge: true });
     await updateUserSubscriptionCount(userId, Number(after) - Number(before));
 
@@ -210,7 +240,7 @@ export const subscriptionService = {
     const existing = await getSubscriptionOrThrow(subscriptionId);
 
     if (existing.userId !== userId) {
-      throw new ApiError(403, "You do not have access to this subscription.");
+      throw new ApiError(403, "Tu n'as pas acces a cet abonnement.");
     }
 
     if (existing.archivedAt) {

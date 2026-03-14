@@ -16,6 +16,7 @@
     "mobile:typecheck": "npm --workspace @subly/mobile run typecheck",
     "functions:build": "npm --workspace @subly/functions run build",
     "functions:serve": "npm --workspace @subly/functions run serve",
+    "seed:emulator": "npm run functions:build && node ./scripts/seed-emulator.cjs",
     "shared:build": "npm --workspace @subly/shared run build",
     "build": "npm run shared:build && npm run functions:build",
     "lint": "npm run lint -ws",
@@ -23,5 +24,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.12.1"
   }
 }

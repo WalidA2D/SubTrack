@@ -45,6 +45,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "chargedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "subscriptionId",
           "order": "ASCENDING"
         },

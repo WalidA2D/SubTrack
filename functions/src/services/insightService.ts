@@ -12,7 +12,7 @@ export function buildInsights(subscriptions: Subscription[]) {
     if (subscription.usageCheckIn === "unused" || (lastUsedTime !== null && lastUsedTime < cutoff)) {
       insights.push({
         type: "unused_subscription",
-        message: `${subscription.providerName} has not been used recently.`
+        message: `${subscription.providerName} semble inactif depuis un moment.`
       });
     }
   });
@@ -27,7 +27,7 @@ export function buildInsights(subscriptions: Subscription[]) {
     if (group.length > 1) {
       insights.push({
         type: "duplicate_subscription",
-        message: `You have ${group.length} active ${group[0].providerName} subscriptions.`
+        message: `Tu as ${group.length} abonnements actifs pour ${group[0].providerName}.`
       });
     }
   });

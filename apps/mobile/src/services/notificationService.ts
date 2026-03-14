@@ -1,18 +1,14 @@
-import messaging from "@react-native-firebase/messaging";
-
 export const notificationService = {
   async registerForPush() {
-    await messaging().requestPermission();
-    return messaging().getToken();
+    return null;
   },
 
   async refreshToken() {
-    return messaging().getToken();
+    return null;
   },
 
   listenForForegroundMessages(handler: (title?: string, body?: string) => void) {
-    return messaging().onMessage(async (message) => {
-      handler(message.notification?.title, message.notification?.body);
-    });
+    void handler;
+    return () => undefined;
   }
 };

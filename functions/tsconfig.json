@@ -5,6 +5,15 @@
     "moduleResolution": "Node",
     "rootDir": "src",
     "outDir": "lib",
+    "baseUrl": ".",
+    "paths": {
+      "@subly/shared": [
+        "../packages/shared/dist"
+      ],
+      "@subly/shared/*": [
+        "../packages/shared/dist/*"
+      ]
+    },
     "types": [
       "node"
     ]

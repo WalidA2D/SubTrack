@@ -2,6 +2,14 @@
 
 Subly is a cross-platform mobile app built with React Native + Expo prebuild.
 
+For the current development phase, the simplest iPhone testing flow is:
+
+- Expo Go on iPhone
+- Firebase JS SDK in the mobile app
+- Local Firebase emulators for the backend
+
+The custom iOS development build flow stays available for later.
+
 Supported targets:
 
 - iOS
@@ -11,7 +19,7 @@ Supported targets:
 
 - Shared UI: React Native
 - Navigation: React Navigation
-- Native Firebase: `@react-native-firebase/*`
+- Current Expo Go path: Firebase JS SDK
 - Cloud builds: EAS Build
 
 ## Android local on Windows
@@ -33,8 +41,19 @@ npm run android
 
 For iOS, either:
 
+- use Expo Go for the current no-Apple-account workflow
 - use a Mac with Xcode and run `expo run:ios`
 - or use EAS Build from the cloud
+
+### Expo Go for now
+
+```powershell
+cd "c:\Users\walid\Desktop\Projet debut\SubTrack"
+npm run functions:serve
+npm run mobile
+```
+
+Then open Expo Go on the iPhone and scan the QR code.
 
 Add `GoogleService-Info.plist` in [apps/mobile](/c:/Users/walid/Desktop/Projet%20debut/SubTrack/apps/mobile), then run:
 

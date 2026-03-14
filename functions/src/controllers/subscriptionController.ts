@@ -48,6 +48,6 @@ export const archiveSubscription = asyncHandler(async (req: Request, res: Respon
   await subscriptionService.archiveSubscription(authReq.user.uid, req.params.id);
 
   res.json({
-    message: "Subscription archived."
+    message: "Abonnement archive."
   });
 });

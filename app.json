@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "5429e8c7-306a-4012-a72e-1b7bbcd9cb92"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.subly.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

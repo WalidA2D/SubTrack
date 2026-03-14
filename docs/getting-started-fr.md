@@ -2,6 +2,16 @@
 
 Ce guide te donne la config exacte pour lancer Subly comme app mobile iOS + Android avec Firebase.
 
+## 0. Mode de test recommande pour maintenant
+
+Tant que tu n'as pas de compte developpeur Apple, le plus simple est :
+
+- iPhone + Expo Go
+- Firebase JS SDK cote mobile
+- backend Firebase local via emulateurs
+
+Le chemin `development build` iOS reste possible plus tard, mais il n'est plus obligatoire pour tester l'app maintenant.
+
 ## 1. Valeurs exactes du projet
 
 Utilise ces valeurs dans Firebase :
@@ -75,7 +85,7 @@ Puis ajoute-la dans :
 Format :
 
 ```env
-FIREBASE_WEB_API_KEY=your-real-key
+AUTH_WEB_API_KEY=your-real-key
 ```
 
 ## 4. Fichiers .env
@@ -154,7 +164,27 @@ npm run android
 
 Si c'est le premier lancement, cela construit le client natif avec `expo run:android`.
 
-## 9. Lancer iOS
+## 9. Lancer iPhone avec Expo Go
+
+Dans un second terminal :
+
+```powershell
+cd "c:\Users\walid\Desktop\Projet debut\SubTrack"
+npm run mobile
+```
+
+Puis :
+
+1. Ouvre Expo Go sur l'iPhone
+2. Scanne le QR code
+3. Verifie que l'iPhone et le PC sont sur le meme Wi-Fi
+
+Important :
+
+- dans [apps/mobile/.env](/c:/Users/walid/Desktop/Projet%20debut/SubTrack/apps/mobile/.env), garde l'IP locale du PC pour l'iPhone
+- ne mets pas `10.0.2.2` pour l'iPhone
+
+## 10. Lancer iOS plus tard avec un compte Apple
 
 ### Option A - avec un Mac
 
@@ -177,7 +207,7 @@ npx eas login
 npx eas build --platform ios --profile preview
 ```
 
-## 10. Build Android
+## 11. Build Android
 
 Pour un build partageable Android :
 
@@ -193,7 +223,7 @@ Pour la prod :
 npx eas build --platform android --profile production
 ```
 
-## 11. Checklist rapide
+## 12. Checklist rapide
 
 Avant de lancer, verifie :
 
@@ -201,11 +231,12 @@ Avant de lancer, verifie :
 - `apps/mobile/GoogleService-Info.plist` existe
 - `apps/mobile/.env` existe
 - `functions/.env` existe
-- `functions/.env` contient une vraie `FIREBASE_WEB_API_KEY`
+- `functions/.env` contient une vraie `AUTH_WEB_API_KEY`
 - Email/Password est active dans Firebase Auth
 - L'emulateur Android est demarre
+- Si tu testes sur iPhone, Expo Go est installe sur l'appareil
 
-## 12. En cas de blocage
+## 13. En cas de blocage
 
 Les endroits les plus utiles a verifier sont :
 

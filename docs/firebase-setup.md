@@ -22,7 +22,7 @@ Enable these Firebase services in the project:
 Set this for Cloud Functions:
 
 ```text
-FIREBASE_WEB_API_KEY=<firebase web api key>
+AUTH_WEB_API_KEY=<firebase web api key>
 ```
 
 This is required for the REST wrapper endpoints:

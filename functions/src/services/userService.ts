@@ -10,7 +10,7 @@ export const userService = {
     const snapshot = await usersCollection.doc(userId).get();
 
     if (!snapshot.exists) {
-      throw new ApiError(404, "User profile not found.");
+      throw new ApiError(404, "Profil utilisateur introuvable.");
     }
 
     return snapshot.data();
@@ -20,7 +20,7 @@ export const userService = {
     const snapshot = await usersCollection.doc(userId).get();
 
     if (!snapshot.exists) {
-      throw new ApiError(404, "User profile not found.");
+      throw new ApiError(404, "Profil utilisateur introuvable.");
     }
 
     const current = snapshot.data() as {
@@ -66,10 +66,10 @@ export const userService = {
     await usersCollection.doc(user.uid).set({
       id: user.uid,
       email: user.email ?? "",
-      displayName: user.displayName ?? "Subly User",
+      displayName: user.displayName ?? "Utilisateur Subly",
       photoUrl: user.photoURL ?? null,
       planTier: "free",
-      currency: "USD",
+      currency: "EUR",
       notificationPreferences: {
         paymentReminders: true,
         trialReminders: true,

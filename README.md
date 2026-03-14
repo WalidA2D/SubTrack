@@ -57,3 +57,9 @@ Subly is a startup-grade subscription management platform built for iOS and Andr
 - Connect purchases for premium upgrades with RevenueCat or App Store / Play Billing
 - Expand scheduled billing materialization jobs and add analytics aggregation tables
 - Introduce crash reporting, analytics, and A/B test hooks
+
+npm run functions:serve
+npm run seed:emulator
+npm run mobile
+
+

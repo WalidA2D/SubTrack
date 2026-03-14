@@ -39,17 +39,19 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
+    minHeight: 54,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius.md,
+    borderRadius: 18,
     paddingHorizontal: spacing.lg
   },
   primary: {
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "#FFD18A"
   },
   secondary: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
     borderColor: colors.border
   },
@@ -61,7 +63,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   primaryLabel: {
-    color: colors.surface
+    color: "#241602"
   },
   secondaryLabel: {
     color: colors.textPrimary

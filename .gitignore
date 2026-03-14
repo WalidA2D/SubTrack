@@ -10,3 +10,8 @@ ios/Pods
 .env
 .env.*
 !.env.example
+functions/lib
+tmp
+*.tsbuildinfo
+apps/mobile/google-services.json
+apps/mobile/GoogleService-Info.plist

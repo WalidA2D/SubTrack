@@ -1,94 +1,195 @@
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
-import { RootStackParamList } from "../../navigation/types";
-import { sampleSubscriptions } from "../../types/mockData";
+import { ServiceLogo } from "../../components/ServiceLogo";
+import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
+import { useWorkspaceStore } from "../../store/workspaceStore";
 import { colors, radius, spacing } from "../../theme";
-
-type Navigation = NativeStackNavigationProp<RootStackParamList>;
-type DetailsRoute = RouteProp<RootStackParamList, "SubscriptionDetails">;
+import {
+  formatBillingFrequency,
+  formatCurrency,
+  formatLongDate,
+  formatReminderDays,
+  formatStatus,
+  formatUsageCheckIn
+} from "../../utils/format";
 
 export function SubscriptionDetailsScreen(): JSX.Element {
-  const navigation = useNavigation<Navigation>();
-  const route = useRoute<DetailsRoute>();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 390;
+  const isTablet = width >= 768;
+  const navigation = useAppNavigation();
+  const route = useCurrentOverlayRoute();
+  const subscriptions = useWorkspaceStore((state) => state.subscriptions);
+  const archiveSubscription = useWorkspaceStore((state) => state.archiveSubscription);
   const subscription =
-    sampleSubscriptions.find((item) => item.id === route.params.subscriptionId) ??
-    sampleSubscriptions[0];
+    subscriptions.find(
+      (item) =>
+        route?.name === "SubscriptionDetails" &&
+        item.id === route.params.subscriptionId
+    ) ?? null;
+
+  if (!subscription) {
+    return (
+      <Screen
+        title="Abonnement introuvable"
+        subtitle="Reviens a la liste pour recharger les donnees."
+        action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
+      >
+        <View style={styles.card}>
+          <Text style={styles.rowValue}>L'abonnement selectionne n'est plus disponible.</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  const handleArchive = () => {
+    Alert.alert(
+      "Archiver l'abonnement ?",
+      "Il disparaitra de la liste active mais restera trace dans l'historique Firestore.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Archiver",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await archiveSubscription(subscription.id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert(
+                "Archivage impossible",
+                error instanceof Error ? error.message : "Merci de reessayer."
+              );
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <Screen
       title={subscription.providerName}
-      subtitle="A detailed view of billing, usage signals, and subscription actions."
+      subtitle="Le detail de la facturation, des signaux d'usage et des actions disponibles."
+      action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
     >
-      <View style={styles.hero}>
-        <Text style={styles.amount}>${subscription.price.toFixed(2)}</Text>
-        <Text style={styles.meta}>{subscription.billingFrequency} billing</Text>
-        <Text style={styles.meta}>Next charge: {subscription.nextBillingDate.slice(0, 10)}</Text>
+      <View
+        style={[
+          styles.hero,
+          isCompact ? styles.heroCompact : null,
+          isTablet ? styles.heroTablet : null
+        ]}
+      >
+        <ServiceLogo providerName={subscription.providerName} size={76} />
+        <View style={styles.heroText}>
+          <Text style={styles.amount}>
+            {formatCurrency(subscription.price, subscription.currency)}
+          </Text>
+          <Text style={styles.meta}>{formatBillingFrequency(subscription.billingFrequency)}</Text>
+          <Text style={styles.meta}>
+            Prochain prelevement : {formatLongDate(subscription.nextBillingDate)}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Category" value={subscription.categoryName} />
-        <DetailRow label="Status" value={subscription.status} />
-        <DetailRow label="Reminder" value={`${subscription.reminderDaysBefore} days before`} />
-        <DetailRow label="Last used" value={subscription.lastUsedAt?.slice(0, 10) ?? "Not set"} />
-        <DetailRow label="Notes" value={subscription.notes ?? "No notes"} />
+        <DetailRow compact={isCompact} label="Categorie" value={subscription.categoryName} />
+        <DetailRow compact={isCompact} label="Statut" value={formatStatus(subscription.status)} />
+        <DetailRow
+          compact={isCompact}
+          label="Rappel"
+          value={formatReminderDays(subscription.reminderDaysBefore)}
+        />
+        <DetailRow
+          compact={isCompact}
+          label="Derniere utilisation"
+          value={subscription.lastUsedAt ? formatLongDate(subscription.lastUsedAt) : "Non renseignee"}
+        />
+        <DetailRow compact={isCompact} label="Usage" value={formatUsageCheckIn(subscription.usageCheckIn)} />
+        <DetailRow compact={isCompact} label="Notes" value={subscription.notes || "Aucune note"} />
       </View>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, isTablet ? styles.actionsTablet : null]}>
         <PrimaryButton
-          title="Edit Subscription"
+          title="Modifier"
           onPress={() =>
             navigation.navigate("AddSubscription", {
               subscriptionId: subscription.id
             })
           }
         />
-        <PrimaryButton title="Mark As Paid" onPress={() => undefined} variant="secondary" />
+        <PrimaryButton title="Archiver" onPress={handleArchive} variant="secondary" />
       </View>
     </Screen>
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
+function DetailRow({
+  label,
+  value,
+  compact = false
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}): JSX.Element {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, compact ? styles.rowCompact : null]}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+      <Text style={[styles.rowValue, compact ? styles.rowValueCompact : null]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: radius.lg,
     padding: spacing.xl,
+    gap: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  heroCompact: {
+    alignItems: "flex-start",
+    flexDirection: "column"
+  },
+  heroTablet: {
+    padding: spacing.xxl
+  },
+  heroText: {
+    flex: 1,
     gap: spacing.xs
   },
   amount: {
     fontSize: 34,
     fontWeight: "700",
-    color: colors.surface
+    color: colors.textPrimary
   },
   meta: {
     fontSize: 15,
-    color: "#E0E7FF",
-    textTransform: "capitalize"
+    color: colors.textSecondary
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
     padding: spacing.lg,
-    gap: spacing.md
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border
   },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md
+  },
+  rowCompact: {
+    flexDirection: "column"
   },
   rowLabel: {
     fontSize: 14,
@@ -99,10 +200,15 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 15,
     fontWeight: "600",
-    color: colors.textPrimary,
-    textTransform: "capitalize"
+    color: colors.textPrimary
+  },
+  rowValueCompact: {
+    textAlign: "left"
   },
   actions: {
     gap: spacing.md
+  },
+  actionsTablet: {
+    flexDirection: "row"
   }
 });

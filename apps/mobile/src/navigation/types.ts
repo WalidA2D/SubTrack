@@ -3,13 +3,13 @@ export type RootStackParamList = {
   Auth: undefined;
   MainTabs: undefined;
   AddSubscription: { subscriptionId?: string } | undefined;
+  Subscriptions: undefined;
   SubscriptionDetails: { subscriptionId: string };
   Profile: undefined;
+  Settings: undefined;
 };
 
 export type MainTabParamList = {
   Dashboard: undefined;
-  Subscriptions: undefined;
   Statistics: undefined;
-  Settings: undefined;
 };

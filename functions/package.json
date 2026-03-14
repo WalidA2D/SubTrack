@@ -7,10 +7,10 @@
     "node": "20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "serve": "firebase emulators:start --only functions,firestore,auth,storage",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "build": "npm --prefix .. run shared:build && tsc -p tsconfig.json",
+    "serve": "npm run build && npx firebase emulators:start --only functions,firestore,auth,storage",
+    "typecheck": "npm --prefix .. run shared:build && tsc -p tsconfig.json --noEmit",
+    "lint": "npm --prefix .. run shared:build && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@subly/shared": "*",
