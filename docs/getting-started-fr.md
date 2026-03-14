@@ -115,7 +115,7 @@ EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:5001/subly-dev/europe-west1/api/api/v1
 Si tu testes sur un vrai telephone, remplace par l'IP de ton PC sur le meme Wi-Fi :
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.24:5001/subly-dev/europe-west1/api/api/v1
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_LOCAL_IP:5001/subly-dev/europe-west1/api/api/v1
 ```
 
 ## 5. Installer les prerequis
