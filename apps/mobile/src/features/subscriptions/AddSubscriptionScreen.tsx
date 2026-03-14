@@ -199,6 +199,11 @@ export function AddSubscriptionScreen(): JSX.Element {
       return;
     }
 
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(nextBillingDate.trim())) {
+      Alert.alert("Date invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      return;
+    }
+
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
       Alert.alert("Prix invalide", "Entre un montant superieur a zero.");
       return;
@@ -506,7 +511,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                   label="Prochaine facturation"
                   value={nextBillingDate}
                   onChangeText={setNextBillingDate}
-                  placeholder="2026-03-25"
+                  placeholder="25/03/2026"
                 />
                 <Field
                   label="Rappel (jours avant)"
@@ -582,7 +587,7 @@ function getSuggestedDate(frequency: BillingFrequency) {
     date.setMonth(date.getMonth() + 1);
   }
 
-  return date.toISOString().slice(0, 10);
+  return toDateInputValue(date.toISOString());
 }
 
 const styles = StyleSheet.create({

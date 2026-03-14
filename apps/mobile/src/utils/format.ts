@@ -11,22 +11,22 @@ export function formatCurrency(amount: number, currency = "EUR"): string {
 
 export function formatShortDate(dateString: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short"
+    day: "2-digit",
+    month: "2-digit"
   }).format(new Date(dateString));
 }
 
 export function formatLongDate(dateString: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "long",
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric"
   }).format(new Date(dateString));
 }
 
 export function formatMonthLabel(monthKey: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
-    month: "short",
+    month: "2-digit",
     year: "numeric"
   }).format(new Date(`${monthKey}-01T00:00:00.000Z`));
 }
@@ -100,11 +100,46 @@ export function formatInsightTitle(type: string): string {
 }
 
 export function toDateInputValue(dateString: string): string {
-  return dateString.slice(0, 10);
+  const date = new Date(dateString);
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
 }
 
 export function toIsoDate(dateInput: string): string {
-  return new Date(`${dateInput}T09:00:00.000Z`).toISOString();
+  const trimmedInput = dateInput.trim();
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmedInput)) {
+    const [dayValue, monthValue, yearValue] = trimmedInput.split("/");
+    day = Number(dayValue);
+    month = Number(monthValue);
+    year = Number(yearValue);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(trimmedInput)) {
+    const [yearValue, monthValue, dayValue] = trimmedInput.split("-");
+    day = Number(dayValue);
+    month = Number(monthValue);
+    year = Number(yearValue);
+  } else {
+    throw new Error("La date doit etre au format JJ/MM/AAAA.");
+  }
+
+  const normalizedDate = new Date(Date.UTC(year, month - 1, day, 9, 0, 0));
+  const isValidDate =
+    normalizedDate.getUTCFullYear() === year &&
+    normalizedDate.getUTCMonth() === month - 1 &&
+    normalizedDate.getUTCDate() === day;
+
+  if (!isValidDate) {
+    throw new Error("La date saisie est invalide.");
+  }
+
+  return normalizedDate.toISOString();
 }
 
 export function buildCategoryId(categoryName: string, userId?: string): string {

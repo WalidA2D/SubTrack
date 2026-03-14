@@ -1,6 +1,7 @@
 import { PropsWithChildren, ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
+import { BrandLogo } from "./BrandLogo";
 import { colors, spacing } from "../theme";
 
 type ScreenProps = PropsWithChildren<{
@@ -39,7 +40,7 @@ export function Screen({
       >
         <View style={[styles.header, isCompact ? styles.headerCompact : null]}>
           <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>Subly</Text>
+            <BrandLogo compact={isCompact} />
             <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
@@ -95,13 +96,6 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
     gap: spacing.xs
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    color: colors.primary,
-    textTransform: "uppercase"
   },
   title: {
     fontSize: 32,

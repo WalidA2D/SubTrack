@@ -11,10 +11,10 @@ import {
 } from "react-native";
 import { Subscription } from "@subly/shared";
 
+import { BrandLogo } from "../../components/BrandLogo";
 import { ServiceLogo } from "../../components/ServiceLogo";
 import { SubscriptionListItem } from "../../components/SubscriptionListItem";
 import { useAppNavigation } from "../../store/navigationStore";
-import { useAuthStore } from "../../store/authStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { colors, radius, shadows, spacing } from "../../theme";
 import {
@@ -34,12 +34,13 @@ type BubbleLayout = {
   duration: number;
 };
 
+const MAX_BUBBLES = 5;
+
 export function DashboardScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
   const isTablet = width >= 768;
   const navigation = useAppNavigation();
-  const session = useAuthStore((state) => state.session);
   const dashboard = useWorkspaceStore((state) => state.dashboard);
   const profile = useWorkspaceStore((state) => state.profile);
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
@@ -49,14 +50,14 @@ export function DashboardScreen(): JSX.Element {
   const currency = profile?.currency ?? "EUR";
   const upcomingPayments = dashboard?.upcomingPayments ?? [];
   const insights = dashboard?.insights ?? [];
-  const bubbleLayouts = useMemo(
-    () => buildBubbleLayouts(width, isCompact),
-    [isCompact, width]
+  const floatingSubscriptions = useMemo(
+    () => selectBubbleSubscriptions(subscriptions, MAX_BUBBLES),
+    [subscriptions]
   );
-  const floatingSubscriptions = [...subscriptions]
-    .sort((left, right) => right.priceMonthly - left.priceMonthly)
-    .slice(0, bubbleLayouts.length);
-  const displayName = profile?.displayName ?? session?.displayName ?? "Subly";
+  const bubbleLayouts = useMemo(
+    () => buildBubbleLayouts(width, isCompact, floatingSubscriptions, subscriptions),
+    [floatingSubscriptions, isCompact, subscriptions, width]
+  );
   const summaryLabel = showAnnualTotal ? "Total annuel" : "Total mensuel";
   const summaryValue = showAnnualTotal
     ? dashboard?.yearlyEstimate ?? 0
@@ -76,20 +77,7 @@ export function DashboardScreen(): JSX.Element {
         contentContainerStyle={styles.content}
       >
         <View style={[styles.topBar, isCompact ? styles.topBarCompact : null]}>
-          <Pressable
-            style={styles.profileChip}
-            onPress={() => navigation.navigate("Profile")}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarLabel}>
-                {displayName.trim().charAt(0).toUpperCase() || "S"}
-              </Text>
-            </View>
-            <View style={styles.overviewPill}>
-              <Text style={styles.overviewPillText}>Apercu</Text>
-            </View>
-          </Pressable>
-
+          <BrandLogo compact={isCompact} />
           <View style={styles.actionRow}>
             <IconActionButton kind="profile" onPress={() => navigation.navigate("Profile")} />
             <IconActionButton kind="settings" onPress={() => navigation.navigate("Settings")} />
@@ -438,38 +426,8 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   topBarCompact: {
-    flexWrap: "wrap"
-  },
-  profileChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm
-  },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFC94D"
-  },
-  avatarLabel: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#2B1800"
-  },
-  overviewPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderWidth: 1,
-    borderColor: "#F4D8FF"
-  },
-  overviewPillText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#B35FA6"
+    flexWrap: "wrap",
+    justifyContent: "space-between"
   },
   actionRow: {
     flexDirection: "row",
@@ -782,16 +740,19 @@ const styles = StyleSheet.create({
   }
 });
 
-function buildBubbleLayouts(screenWidth: number, isCompact: boolean): BubbleLayout[] {
+function buildBubbleLayouts(
+  screenWidth: number,
+  isCompact: boolean,
+  visibleSubscriptions: Subscription[],
+  allSubscriptions: Subscription[]
+): BubbleLayout[] {
   const stageWidth = Math.min(Math.max(screenWidth - spacing.lg * 2, 280), 540);
   const centerLeft = stageWidth * (isCompact ? 0.33 : 0.38);
   const haloInset = isCompact ? 8 : 12;
-
-  return [
+  const baseLayouts = [
     {
       top: 16,
       left: centerLeft,
-      size: isCompact ? 72 : 84,
       floatX: 8,
       floatY: 10,
       duration: 4200
@@ -799,7 +760,6 @@ function buildBubbleLayouts(screenWidth: number, isCompact: boolean): BubbleLayo
     {
       top: 88,
       left: haloInset,
-      size: isCompact ? 58 : 62,
       floatX: -6,
       floatY: 8,
       duration: 4700
@@ -807,7 +767,6 @@ function buildBubbleLayouts(screenWidth: number, isCompact: boolean): BubbleLayo
     {
       top: isCompact ? 94 : 100,
       right: haloInset,
-      size: isCompact ? 96 : 112,
       floatX: 9,
       floatY: -9,
       duration: 5100
@@ -815,7 +774,6 @@ function buildBubbleLayouts(screenWidth: number, isCompact: boolean): BubbleLayo
     {
       bottom: isCompact ? 28 : 34,
       left: stageWidth * (isCompact ? 0.3 : 0.34),
-      size: isCompact ? 62 : 68,
       floatX: 6,
       floatY: 9,
       duration: 4600
@@ -823,12 +781,16 @@ function buildBubbleLayouts(screenWidth: number, isCompact: boolean): BubbleLayo
     {
       bottom: 16,
       right: stageWidth * (isCompact ? 0.23 : 0.28),
-      size: isCompact ? 54 : 58,
       floatX: -5,
       floatY: 7,
       duration: 4900
     }
   ];
+
+  return baseLayouts.map((layout, index) => ({
+    ...layout,
+    size: getBubbleSizeForSubscription(visibleSubscriptions[index], allSubscriptions, isCompact)
+  }));
 }
 
 function getClusterHaloStyle(screenWidth: number, kind: "large" | "small") {
@@ -855,4 +817,50 @@ function getClusterHaloStyle(screenWidth: number, kind: "large" | "small") {
     top: 82,
     left: stageWidth * 0.38
   };
+}
+
+function selectBubbleSubscriptions(
+  subscriptions: Subscription[],
+  maxCount: number
+) {
+  const sortedByPrice = [...subscriptions].sort(
+    (left, right) => right.priceMonthly - left.priceMonthly
+  );
+  const visible = sortedByPrice.slice(0, maxCount);
+  const latestSubscription = [...subscriptions].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  )[0];
+
+  if (latestSubscription && !visible.some((item) => item.id === latestSubscription.id)) {
+    visible.pop();
+    visible.push(latestSubscription);
+  }
+
+  return visible.sort((left, right) => right.priceMonthly - left.priceMonthly);
+}
+
+function getBubbleSizeForSubscription(
+  subscription: Subscription | undefined,
+  allSubscriptions: Subscription[],
+  isCompact: boolean
+) {
+  const minSize = isCompact ? 54 : 58;
+  const maxSize = isCompact ? 108 : 124;
+
+  if (!subscription || allSubscriptions.length === 0) {
+    return Math.round((minSize + maxSize) / 2);
+  }
+
+  const monthlyPrices = allSubscriptions.map((item) => item.priceMonthly);
+  const minPrice = Math.min(...monthlyPrices);
+  const maxPrice = Math.max(...monthlyPrices);
+
+  if (minPrice === maxPrice) {
+    return Math.round((minSize + maxSize) / 2);
+  }
+
+  const normalized = (subscription.priceMonthly - minPrice) / (maxPrice - minPrice);
+
+  return Math.round(minSize + normalized * (maxSize - minSize));
 }
