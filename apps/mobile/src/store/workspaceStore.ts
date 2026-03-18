@@ -144,21 +144,56 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   async updateSettings(payload) {
-    set({ isLoading: true, error: null });
+    const previousProfile = get().profile;
+    const optimisticProfile = previousProfile
+      ? {
+          ...previousProfile,
+          ...(payload.currency ? { currency: payload.currency } : {}),
+          ...(payload.language ? { language: payload.language } : {}),
+          ...(payload.colorBlindMode !== undefined
+            ? { colorBlindMode: payload.colorBlindMode }
+            : {}),
+          ...(payload.notificationPreferences
+            ? {
+                notificationPreferences: {
+                  ...previousProfile.notificationPreferences,
+                  ...payload.notificationPreferences
+                }
+              }
+            : {})
+        }
+      : null;
+
+    set({
+      isLoading: true,
+      error: null,
+      ...(optimisticProfile ? { profile: optimisticProfile } : {})
+    });
 
     try {
-      await sublyApi.updateSettings(payload);
-      const data = await fetchWorkspaceData();
-      const session = useAuthStore.getState().session;
+      const profile = await sublyApi.updateSettings(payload);
+      if (payload.currency) {
+        const data = await fetchWorkspaceData();
+        const session = useAuthStore.getState().session;
 
-      set({
-        ...data,
-        hydratedUserId: session?.uid ?? null,
+        set({
+          ...data,
+          hydratedUserId: session?.uid ?? null,
+          isLoading: false,
+          error: null
+        });
+        return;
+      }
+
+      set((state) => ({
+        ...state,
+        profile,
         isLoading: false,
         error: null
-      });
+      }));
     } catch (error) {
       set({
+        ...(previousProfile ? { profile: previousProfile } : {}),
         isLoading: false,
         error:
           error instanceof Error ? error.message : "Impossible de mettre a jour les reglages."

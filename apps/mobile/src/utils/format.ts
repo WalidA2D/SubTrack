@@ -1,7 +1,9 @@
 import { BillingFrequency, SubscriptionStatus, UsageCheckIn } from "@subly/shared";
 
+import { getActiveFormatLocale, translate } from "../i18n";
+
 export function formatCurrency(amount: number, currency = "EUR"): string {
-  return new Intl.NumberFormat("fr-FR", {
+  return new Intl.NumberFormat(getActiveFormatLocale(), {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -10,14 +12,14 @@ export function formatCurrency(amount: number, currency = "EUR"): string {
 }
 
 export function formatShortDate(dateString: string): string {
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(getActiveFormatLocale(), {
     day: "2-digit",
     month: "2-digit"
   }).format(new Date(dateString));
 }
 
 export function formatLongDate(dateString: string): string {
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(getActiveFormatLocale(), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"
@@ -25,7 +27,7 @@ export function formatLongDate(dateString: string): string {
 }
 
 export function formatMonthLabel(monthKey: string): string {
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(getActiveFormatLocale(), {
     month: "2-digit",
     year: "numeric"
   }).format(new Date(`${monthKey}-01T00:00:00.000Z`));
@@ -33,76 +35,80 @@ export function formatMonthLabel(monthKey: string): string {
 
 export function formatBillingFrequency(frequency: BillingFrequency): string {
   if (frequency === "weekly") {
-    return "Hebdomadaire";
+    return translate("format.billing.weekly");
+  }
+
+  if (frequency === "quarterly") {
+    return translate("format.billing.quarterly");
   }
 
   if (frequency === "yearly") {
-    return "Annuel";
+    return translate("format.billing.yearly");
   }
 
-  return "Mensuel";
+  return translate("format.billing.monthly");
 }
 
 export function formatStatus(status: SubscriptionStatus): string {
   if (status === "trial") {
-    return "Essai";
+    return translate("format.status.trial");
   }
 
   if (status === "paused") {
-    return "En pause";
+    return translate("format.status.paused");
   }
 
   if (status === "cancelled") {
-    return "Annule";
+    return translate("format.status.cancelled");
   }
 
-  return "Actif";
+  return translate("format.status.active");
 }
 
 export function formatUsageCheckIn(usageCheckIn: UsageCheckIn): string {
   if (usageCheckIn === "unused") {
-    return "Peu utilise";
+    return translate("format.usage.unused");
   }
 
   if (usageCheckIn === "uncertain") {
-    return "A verifier";
+    return translate("format.usage.uncertain");
   }
 
-  return "Utilise";
+  return translate("format.usage.active");
 }
 
 export function formatReminderDays(days: number): string {
   if (days <= 0) {
-    return "Le jour meme";
+    return translate("format.reminder.sameDay");
   }
 
   if (days === 1) {
-    return "1 jour avant";
+    return translate("format.reminder.oneDay");
   }
 
-  return `${days} jours avant`;
+  return translate("format.reminder.daysBefore", { count: days });
 }
 
 export function formatInsightTitle(type: string): string {
   if (type === "unused_subscription") {
-    return "Abonnement a surveiller";
+    return translate("format.insight.unused");
   }
 
   if (type === "duplicate_subscription") {
-    return "Doublon detecte";
+    return translate("format.insight.duplicate");
   }
 
   if (type === "payment_due") {
-    return "Paiement a venir";
+    return translate("format.insight.paymentDue");
   }
 
-  return "Alerte Subly";
+  return translate("format.insight.default");
 }
 
 export function toDateInputValue(dateString: string): string {
   const date = new Date(dateString);
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(getActiveFormatLocale(), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"

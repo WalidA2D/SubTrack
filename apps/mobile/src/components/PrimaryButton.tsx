@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 
-import { colors, radius, spacing } from "../theme";
+import { AppTheme, spacing, useAppTheme } from "../theme";
 
 type PrimaryButtonProps = {
   title: string;
@@ -15,6 +15,9 @@ export function PrimaryButton({
   variant = "primary",
   disabled = false
 }: PrimaryButtonProps): JSX.Element {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
+
   return (
     <Pressable
       onPress={onPress}
@@ -37,35 +40,36 @@ export function PrimaryButton({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    minHeight: 54,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    paddingHorizontal: spacing.lg
-  },
-  primary: {
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: "#FFD18A"
-  },
-  secondary: {
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border
-  },
-  disabled: {
-    opacity: 0.5
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "700"
-  },
-  primaryLabel: {
-    color: "#241602"
-  },
-  secondaryLabel: {
-    color: colors.textPrimary
-  }
-});
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    button: {
+      minHeight: 54,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 18,
+      paddingHorizontal: spacing.lg
+    },
+    primary: {
+      backgroundColor: theme.colors.primary,
+      borderWidth: 1,
+      borderColor: theme.colors.warning
+    },
+    secondary: {
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    disabled: {
+      opacity: 0.5
+    },
+    label: {
+      fontSize: 16,
+      fontWeight: "700"
+    },
+    primaryLabel: {
+      color: "#241602"
+    },
+    secondaryLabel: {
+      color: theme.colors.textPrimary
+    }
+  });

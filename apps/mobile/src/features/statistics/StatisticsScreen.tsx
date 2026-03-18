@@ -9,18 +9,10 @@ import {
 } from "react-native";
 
 import { Screen } from "../../components/Screen";
+import { useAppTranslation } from "../../i18n";
 import { useWorkspaceStore } from "../../store/workspaceStore";
-import { colors, radius, shadows, spacing } from "../../theme";
+import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
 import { formatCurrency, formatMonthLabel } from "../../utils/format";
-
-const CHART_COLORS = [
-  colors.primary,
-  colors.secondary,
-  colors.success,
-  colors.danger,
-  "#7BE7FF",
-  "#F38BFF"
-];
 
 type CategorySlice = {
   categoryId: string;
@@ -45,7 +37,10 @@ type ChartPoint = {
 export function StatisticsScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const statistics = useWorkspaceStore((state) => state.statistics);
+  const { t } = useAppTranslation();
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const profile = useWorkspaceStore((state) => state.profile);
   const currency = profile?.currency ?? "EUR";
@@ -56,7 +51,7 @@ export function StatisticsScreen(): JSX.Element {
   const categoryData: CategorySlice[] = categorySource.slice(0, 6).map((item, index) => ({
     ...item,
     percentage: categoryTotal > 0 ? item.amountMonthly / categoryTotal : 0,
-    color: CHART_COLORS[index % CHART_COLORS.length]
+    color: theme.chartColors[index % theme.chartColors.length]
   }));
   const monthlyTrend = [...(statistics?.monthlyTrend ?? [])]
     .sort((left, right) => left.month.localeCompare(right.month))
@@ -65,38 +60,38 @@ export function StatisticsScreen(): JSX.Element {
     monthlyTrend.length > 0
       ? monthlyTrend.reduce((sum, item) => sum + item.amount, 0) / monthlyTrend.length
       : 0;
-  const unusedCount = subscriptions.filter((item) => item.usageCheckIn === "unused").length;
+  const lowUtilityCount = getLowUtilitySubscriptionCount(subscriptions);
   const biggestSubscription = statistics?.biggestSubscriptions[0];
   const topCategory = categoryData[0];
 
   return (
     <Screen
-      title="Statistiques"
-      subtitle="Barres, evolution mensuelle et comparaison des categories dans une seule vue."
+      title={t("statistics.title")}
+      subtitle={t("statistics.subtitle")}
     >
       <View style={styles.summaryGrid}>
         <SummaryCard
           compactWidth={isCompact}
-          label="Actifs"
+          label={t("statistics.active")}
           value={String(statistics?.subscriptionCount ?? 0)}
           tone="orange"
         />
         <SummaryCard
           compactWidth={isCompact}
-          label="Peu utilises"
-          value={String(unusedCount)}
+          label={t("statistics.lowUsage")}
+          value={String(lowUtilityCount)}
           tone="purple"
         />
         <SummaryCard
           compactWidth={isCompact}
-          label="Moyenne / mois"
+          label={t("statistics.averagePerMonth")}
           value={formatCurrency(monthlyAverage, currency)}
           tone="green"
         />
         <SummaryCard
           compactWidth={isCompact}
-          label="Top categorie"
-          value={topCategory?.categoryName ?? "Aucune"}
+          label={t("statistics.topCategory")}
+          value={topCategory?.categoryName ?? t("statistics.none")}
           tone="red"
           compact
         />
@@ -105,10 +100,10 @@ export function StatisticsScreen(): JSX.Element {
       <View style={styles.card}>
         <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
           <View>
-            <Text style={styles.sectionEyebrow}>Camembert</Text>
-            <Text style={styles.cardTitle}>Depenses par categorie</Text>
+            <Text style={styles.sectionEyebrow}>{t("statistics.pie")}</Text>
+            <Text style={styles.cardTitle}>{t("statistics.spendByCategory")}</Text>
           </View>
-          <MetricPill label="Mensuel" value={formatCurrency(categoryTotal, currency)} />
+          <MetricPill label={t("statistics.monthly")} value={formatCurrency(categoryTotal, currency)} />
         </View>
         <CategoryDonutChart compact={isCompact} data={categoryData} currency={currency} />
       </View>
@@ -116,10 +111,10 @@ export function StatisticsScreen(): JSX.Element {
       <View style={styles.card}>
         <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
           <View>
-            <Text style={styles.sectionEyebrow}>Barres</Text>
-            <Text style={styles.cardTitle}>Comparatif par categorie</Text>
+            <Text style={styles.sectionEyebrow}>{t("statistics.bars")}</Text>
+            <Text style={styles.cardTitle}>{t("statistics.compareByCategory")}</Text>
           </View>
-          <MetricPill label="Leader" value={topCategory?.categoryName ?? "Aucune"} />
+          <MetricPill label={t("statistics.leader")} value={topCategory?.categoryName ?? t("statistics.none")} />
         </View>
         <CategoryBarChart compact={isCompact} data={categoryData} currency={currency} />
       </View>
@@ -127,11 +122,11 @@ export function StatisticsScreen(): JSX.Element {
       <View style={styles.card}>
         <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
           <View>
-            <Text style={styles.sectionEyebrow}>Courbe</Text>
-            <Text style={styles.cardTitle}>Evolution par mois</Text>
+            <Text style={styles.sectionEyebrow}>{t("statistics.curve")}</Text>
+            <Text style={styles.cardTitle}>{t("statistics.evolutionByMonth")}</Text>
           </View>
           <MetricPill
-            label="Dernier mois"
+            label={t("statistics.lastMonth")}
             value={formatCurrency(monthlyTrend.at(-1)?.amount ?? 0, currency)}
           />
         </View>
@@ -139,29 +134,29 @@ export function StatisticsScreen(): JSX.Element {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Temps fort</Text>
+        <Text style={styles.cardTitle}>{t("statistics.highlight")}</Text>
         <InsightRow
-          label="Plus gros abonnement"
+          label={t("statistics.biggestSubscription")}
           value={
             biggestSubscription
               ? `${biggestSubscription.providerName} - ${formatCurrency(
                   biggestSubscription.amountMonthly,
                   currency
                 )} / mois`
-              : "Aucun abonnement actif"
+              : t("statistics.noActiveSubscription")
           }
         />
         <InsightRow
-          label="Dominante"
+          label={t("statistics.dominant")}
           value={
             topCategory
               ? `${topCategory.categoryName} - ${Math.round(topCategory.percentage * 100)}%`
-              : "Aucune categorie"
+              : t("statistics.noCategory")
           }
         />
         <InsightRow
-          label="Sous surveillance"
-          value={`${unusedCount} abonnement${unusedCount > 1 ? "s" : ""} peu utilise`}
+          label={t("statistics.underWatch")}
+          value={t("statistics.lightlyUsed", { count: lowUtilityCount })}
         />
       </View>
     </Screen>
@@ -181,6 +176,8 @@ function SummaryCard({
   compact?: boolean;
   compactWidth?: boolean;
 }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   return (
     <View
       style={[
@@ -201,6 +198,8 @@ function SummaryCard({
 }
 
 function MetricPill({ label, value }: { label: string; value: string }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   return (
     <View style={styles.metricPill}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -220,6 +219,9 @@ function CategoryDonutChart({
   currency: string;
   compact: boolean;
 }): JSX.Element {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
+
   if (data.length === 0) {
     return <EmptyState message="Ajoute quelques abonnements pour voir le camembert par categorie." />;
   }
@@ -240,7 +242,7 @@ function CategoryDonutChart({
   });
 
   while (ringSegments.length < segmentCount) {
-    ringSegments.push(data.at(-1)?.color ?? colors.surfaceContrast);
+    ringSegments.push(data.at(-1)?.color ?? theme.colors.surfaceContrast);
   }
 
   const size = compact ? 186 : 220;
@@ -317,6 +319,8 @@ function CategoryBarChart({
   currency: string;
   compact: boolean;
 }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   if (data.length === 0) {
     return <EmptyState message="Ajoute quelques abonnements pour activer le graphique en barres." />;
   }
@@ -370,6 +374,7 @@ function MonthlyTrendChart({
   currency: string;
   compact: boolean;
 }): JSX.Element {
+  const styles = createStyles(useAppTheme());
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
 
   if (data.length === 0) {
@@ -464,6 +469,8 @@ function MonthlyTrendChart({
 }
 
 function InsightRow({ label, value }: { label: string; value: string }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   return (
     <View style={styles.insightRow}>
       <Text style={styles.insightLabel}>{label}</Text>
@@ -473,6 +480,8 @@ function InsightRow({ label, value }: { label: string; value: string }): JSX.Ele
 }
 
 function EmptyState({ message }: { message: string }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   return (
     <View style={styles.emptyState}>
       <Text style={styles.emptyStateText}>{message}</Text>
@@ -486,7 +495,92 @@ function shrinkLabel(value: string) {
   return firstWord.length > 8 ? `${firstWord.slice(0, 7)}.` : firstWord;
 }
 
-const styles = StyleSheet.create({
+function getLowUtilitySubscriptionCount(subscriptions: Array<{
+  id: string;
+  categoryName: string;
+  normalizedProviderName: string;
+  usageCheckIn: string;
+  lastUsedAt?: string | null;
+  priceMonthly: number;
+}>) {
+  const lowUtilityIds = new Set<string>();
+  const staleUsageCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+  subscriptions.forEach((subscription) => {
+    const lastUsedTime = subscription.lastUsedAt
+      ? new Date(subscription.lastUsedAt).getTime()
+      : null;
+
+    if (
+      subscription.usageCheckIn === "unused" ||
+      (lastUsedTime !== null && lastUsedTime < staleUsageCutoff)
+    ) {
+      lowUtilityIds.add(subscription.id);
+    }
+  });
+
+  markExtraSubscriptionsAsLowUtility(
+    subscriptions,
+    (subscription) => subscription.normalizedProviderName,
+    lowUtilityIds
+  );
+
+  markExtraSubscriptionsAsLowUtility(
+    subscriptions.filter((subscription) =>
+      LOW_UTILITY_CATEGORY_KEYS.has(normalizeCategoryName(subscription.categoryName))
+    ),
+    (subscription) => normalizeCategoryName(subscription.categoryName),
+    lowUtilityIds
+  );
+
+  return lowUtilityIds.size;
+}
+
+function markExtraSubscriptionsAsLowUtility<T extends {
+  id: string;
+  priceMonthly: number;
+  nextBillingDate?: string;
+}>(
+  subscriptions: T[],
+  getGroupKey: (subscription: T) => string,
+  lowUtilityIds: Set<string>
+) {
+  const groups = subscriptions.reduce<Record<string, T[]>>((accumulator, subscription) => {
+    const key = getGroupKey(subscription);
+    accumulator[key] = [...(accumulator[key] ?? []), subscription];
+    return accumulator;
+  }, {});
+
+  Object.values(groups).forEach((group) => {
+    if (group.length <= 1) {
+      return;
+    }
+
+    const sortedGroup = [...group].sort((left, right) => {
+      if (left.priceMonthly !== right.priceMonthly) {
+        return left.priceMonthly - right.priceMonthly;
+      }
+
+      return (left.nextBillingDate ?? "").localeCompare(right.nextBillingDate ?? "");
+    });
+
+    sortedGroup.slice(1).forEach((subscription) => {
+      lowUtilityIds.add(subscription.id);
+    });
+  });
+}
+
+function normalizeCategoryName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+const LOW_UTILITY_CATEGORY_KEYS = new Set(["musique", "streaming", "ai", "securite"]);
+
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   summaryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -524,25 +618,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
-    color: colors.textTertiary,
+    color: theme.colors.textTertiary,
     letterSpacing: 0.8
   },
   summaryValue: {
     fontSize: 24,
     fontWeight: "800",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   summaryValueCompact: {
     fontSize: 19,
     lineHeight: 24
   },
   card: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.colors.border,
     ...shadows.card
   },
   sectionHeader: {
@@ -560,12 +654,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    color: colors.textTertiary
+    color: theme.colors.textTertiary
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   metricPill: {
     minWidth: 110,
@@ -573,22 +667,22 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    backgroundColor: colors.surfaceContrast,
+    backgroundColor: theme.colors.surfaceContrast,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: theme.colors.borderStrong,
     gap: 2
   },
   metricLabel: {
     fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
-    color: colors.textTertiary,
+    color: theme.colors.textTertiary,
     letterSpacing: 0.8
   },
   metricValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   donutLayout: {
     gap: spacing.lg
@@ -602,15 +696,15 @@ const styles = StyleSheet.create({
   },
   donutHalo: {
     position: "absolute",
-    backgroundColor: colors.glowPurple,
+    backgroundColor: theme.colors.glowPurple,
     opacity: 0.65
   },
   donutSurface: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: theme.colors.backgroundElevated,
     borderWidth: 1,
-    borderColor: colors.borderStrong
+    borderColor: theme.colors.borderStrong
   },
   ringSegment: {
     position: "absolute",
@@ -623,9 +717,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: theme.colors.borderStrong,
     gap: 4
   },
   donutCenterCompact: {
@@ -638,13 +732,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.7,
     textTransform: "uppercase",
-    color: colors.textTertiary
+    color: theme.colors.textTertiary
   },
   donutCenterValue: {
     fontSize: 20,
     fontWeight: "800",
     textAlign: "center",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   legendColumn: {
     gap: spacing.sm
@@ -667,11 +761,11 @@ const styles = StyleSheet.create({
   legendTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   legendMeta: {
     fontSize: 13,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   barChartWrap: {
     gap: spacing.md,
@@ -705,7 +799,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     textAlign: "center",
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   barTrack: {
     width: "100%",
@@ -714,9 +808,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 6,
     borderRadius: 22,
-    backgroundColor: colors.surfaceContrast,
+    backgroundColor: theme.colors.surfaceContrast,
     borderWidth: 1,
-    borderColor: colors.borderStrong
+    borderColor: theme.colors.borderStrong
   },
   barFill: {
     width: "100%",
@@ -727,7 +821,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     textAlign: "center",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   trendSection: {
     gap: spacing.md
@@ -735,9 +829,9 @@ const styles = StyleSheet.create({
   trendChart: {
     height: 190,
     borderRadius: radius.md,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: theme.colors.backgroundElevated,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: theme.colors.borderStrong,
     overflow: "hidden"
   },
   trendChartCompact: {
@@ -748,22 +842,22 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     height: 1,
-    backgroundColor: colors.border
+    backgroundColor: theme.colors.border
   },
   trendSegment: {
     position: "absolute",
     height: 4,
     borderRadius: 999,
-    backgroundColor: colors.primaryStrong
+    backgroundColor: theme.colors.primaryStrong
   },
   trendPoint: {
     position: "absolute",
     width: 12,
     height: 12,
     borderRadius: 999,
-    backgroundColor: colors.white,
+    backgroundColor: theme.colors.white,
     borderWidth: 3,
-    borderColor: colors.primaryStrong
+    borderColor: theme.colors.primaryStrong
   },
   trendFooter: {
     flexDirection: "row",
@@ -779,9 +873,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.surfaceContrast,
+    backgroundColor: theme.colors.surfaceContrast,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
   },
   trendMonthCompact: {
     minWidth: "100%"
@@ -789,30 +883,30 @@ const styles = StyleSheet.create({
   trendMonthLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   trendMonthValue: {
     marginTop: 4,
     fontSize: 12,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   insightRow: {
     gap: 6,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border
+    borderBottomColor: theme.colors.border
   },
   insightLabel: {
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    color: colors.textTertiary
+    color: theme.colors.textTertiary
   },
   insightValue: {
     fontSize: 15,
     lineHeight: 22,
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   emptyState: {
     minHeight: 160,
@@ -820,14 +914,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: theme.colors.backgroundElevated,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
   },
   emptyStateText: {
     fontSize: 15,
     lineHeight: 22,
     textAlign: "center",
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   }
 });

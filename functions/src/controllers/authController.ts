@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import {
   DEFAULT_REMINDER_DAYS_BEFORE,
+  DEFAULT_LANGUAGE,
   loginRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema
@@ -28,6 +29,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     photoUrl: null,
     planTier: "free",
     currency: "EUR",
+    language: DEFAULT_LANGUAGE,
+    colorBlindMode: false,
     notificationPreferences: {
       paymentReminders: true,
       trialReminders: true,

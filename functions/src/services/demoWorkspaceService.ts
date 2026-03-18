@@ -1,5 +1,6 @@
 import {
   DEFAULT_REMINDER_DAYS_BEFORE,
+  DEFAULT_LANGUAGE,
   PaymentHistory,
   PREDEFINED_CATEGORY_PRESETS,
   Subscription,
@@ -46,28 +47,33 @@ export async function ensureDemoWorkspace(user: DemoUser) {
   ]);
 
   const now = new Date().toISOString();
-  const createdAt = (userSnapshot.data() as { createdAt?: string } | undefined)?.createdAt ?? now;
+  const existingProfile = userSnapshot.data() as { createdAt?: string } | undefined;
+  const createdAt = existingProfile?.createdAt ?? now;
 
-  await userReference.set(
-    {
-      id: user.uid,
-      email: user.email ?? `${user.uid}@subly.local`,
-      displayName: user.displayName ?? "Utilisateur Subly",
-      photoUrl: null,
-      planTier: "free",
-      currency: "EUR",
-      notificationPreferences: {
-        paymentReminders: true,
-        trialReminders: true,
-        insightNotifications: true,
-        defaultReminderDaysBefore: DEFAULT_REMINDER_DAYS_BEFORE
+  if (!userSnapshot.exists) {
+    await userReference.set(
+      {
+        id: user.uid,
+        email: user.email ?? `${user.uid}@subly.local`,
+        displayName: user.displayName ?? "Utilisateur Subly",
+        photoUrl: null,
+        planTier: "free",
+        currency: "EUR",
+        language: DEFAULT_LANGUAGE,
+        colorBlindMode: false,
+        notificationPreferences: {
+          paymentReminders: true,
+          trialReminders: true,
+          insightNotifications: true,
+          defaultReminderDaysBefore: DEFAULT_REMINDER_DAYS_BEFORE
+        },
+        fcmTokens: [],
+        createdAt,
+        updatedAt: now
       },
-      fcmTokens: [],
-      createdAt,
-      updatedAt: now
-    },
-    { merge: true }
-  );
+      { merge: true }
+    );
+  }
 
   const categoryBatch = db.batch();
   const categories = PREDEFINED_CATEGORY_PRESETS.map((preset) => ({
@@ -96,6 +102,8 @@ export async function ensureDemoWorkspace(user: DemoUser) {
       userId: user.uid,
       providerName: "Netflix",
       normalizedProviderName: "netflix",
+      includedProviderNames: [],
+      logoMode: "option",
       categoryId: `${user.uid}_cat_divertissement`,
       categoryName: "Divertissement",
       price: 17.99,
@@ -119,6 +127,8 @@ export async function ensureDemoWorkspace(user: DemoUser) {
       userId: user.uid,
       providerName: "Spotify",
       normalizedProviderName: "spotify",
+      includedProviderNames: [],
+      logoMode: "option",
       categoryId: `${user.uid}_cat_musique`,
       categoryName: "Musique",
       price: 12.99,
@@ -142,6 +152,8 @@ export async function ensureDemoWorkspace(user: DemoUser) {
       userId: user.uid,
       providerName: "Figma",
       normalizedProviderName: "figma",
+      includedProviderNames: [],
+      logoMode: "option",
       categoryId: `${user.uid}_cat_productivite`,
       categoryName: "Productivite",
       price: 16,
@@ -165,6 +177,8 @@ export async function ensureDemoWorkspace(user: DemoUser) {
       userId: user.uid,
       providerName: "ChatGPT Plus",
       normalizedProviderName: "chatgpt_plus",
+      includedProviderNames: [],
+      logoMode: "option",
       categoryId: `${user.uid}_cat_productivite`,
       categoryName: "Productivite",
       price: 20,
@@ -188,6 +202,8 @@ export async function ensureDemoWorkspace(user: DemoUser) {
       userId: user.uid,
       providerName: "Neoness",
       normalizedProviderName: "neoness",
+      includedProviderNames: [],
+      logoMode: "option",
       categoryId: `${user.uid}_cat_sport`,
       categoryName: "Sport",
       price: 29.9,

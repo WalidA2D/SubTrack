@@ -5,7 +5,8 @@ import { Screen } from "../../components/Screen";
 import { ServiceLogo } from "../../components/ServiceLogo";
 import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
-import { colors, radius, spacing } from "../../theme";
+import { AppTheme, radius, spacing, useAppTheme } from "../../theme";
+import { getLinkedParentSubscriptions } from "../../utils/subscriptionLinks";
 import {
   formatBillingFrequency,
   formatCurrency,
@@ -20,6 +21,8 @@ export function SubscriptionDetailsScreen(): JSX.Element {
   const isCompact = width < 390;
   const isTablet = width >= 768;
   const navigation = useAppNavigation();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const route = useCurrentOverlayRoute();
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const archiveSubscription = useWorkspaceStore((state) => state.archiveSubscription);
@@ -29,6 +32,9 @@ export function SubscriptionDetailsScreen(): JSX.Element {
         route?.name === "SubscriptionDetails" &&
         item.id === route.params.subscriptionId
     ) ?? null;
+  const linkedParentSubscriptions = subscription
+    ? getLinkedParentSubscriptions(subscription, subscriptions)
+    : [];
 
   if (!subscription) {
     return (
@@ -82,7 +88,11 @@ export function SubscriptionDetailsScreen(): JSX.Element {
           isTablet ? styles.heroTablet : null
         ]}
       >
-        <ServiceLogo providerName={subscription.providerName} size={76} />
+        <ServiceLogo
+          providerName={subscription.providerName}
+          logoMode={subscription.logoMode}
+          size={76}
+        />
         <View style={styles.heroText}>
           <Text style={styles.amount}>
             {formatCurrency(subscription.price, subscription.currency)}
@@ -97,6 +107,13 @@ export function SubscriptionDetailsScreen(): JSX.Element {
       <View style={styles.card}>
         <DetailRow compact={isCompact} label="Categorie" value={subscription.categoryName} />
         <DetailRow compact={isCompact} label="Statut" value={formatStatus(subscription.status)} />
+        {subscription.trialEndsAt ? (
+          <DetailRow
+            compact={isCompact}
+            label="Fin de l'essai"
+            value={formatLongDate(subscription.trialEndsAt)}
+          />
+        ) : null}
         <DetailRow
           compact={isCompact}
           label="Rappel"
@@ -110,6 +127,44 @@ export function SubscriptionDetailsScreen(): JSX.Element {
         <DetailRow compact={isCompact} label="Usage" value={formatUsageCheckIn(subscription.usageCheckIn)} />
         <DetailRow compact={isCompact} label="Notes" value={subscription.notes || "Aucune note"} />
       </View>
+
+      {linkedParentSubscriptions.length > 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Abonnement lie</Text>
+          <Text style={styles.sectionHint}>
+            Cet abonnement est actuellement couvert ou rattache a :
+          </Text>
+          <View style={styles.includedWrap}>
+            {linkedParentSubscriptions.map((parentSubscription) => (
+              <View key={parentSubscription.id} style={styles.includedChip}>
+                <ServiceLogo
+                  providerName={parentSubscription.providerName}
+                  logoMode={parentSubscription.logoMode}
+                  size={30}
+                />
+                <Text style={styles.includedLabel}>{parentSubscription.providerName}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {(subscription.includedProviderNames?.length ?? 0) > 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Services inclus</Text>
+          <Text style={styles.sectionHint}>
+            Ces services sont compris dans cet abonnement et peuvent faire partie de ses avantages.
+          </Text>
+          <View style={styles.includedWrap}>
+            {(subscription.includedProviderNames ?? []).map((providerName) => (
+              <View key={providerName} style={styles.includedChip}>
+                <ServiceLogo providerName={providerName} size={30} />
+                <Text style={styles.includedLabel}>{providerName}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={[styles.actions, isTablet ? styles.actionsTablet : null]}>
         <PrimaryButton
@@ -135,6 +190,8 @@ function DetailRow({
   value: string;
   compact?: boolean;
 }): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
   return (
     <View style={[styles.row, compact ? styles.rowCompact : null]}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -143,14 +200,14 @@ function DetailRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   hero: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.colors.border,
     flexDirection: "row",
     alignItems: "center"
   },
@@ -168,19 +225,29 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 34,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   meta: {
     fontSize: 15,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   card: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
+  },
+  sectionHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.colors.textSecondary
   },
   row: {
     flexDirection: "row",
@@ -193,17 +260,41 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: 14,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   rowValue: {
     flex: 1,
     textAlign: "right",
     fontSize: 15,
     fontWeight: "600",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   rowValueCompact: {
     textAlign: "left"
+  },
+  includedWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  includedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minHeight: 42,
+    maxWidth: "100%",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  includedLabel: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.textPrimary
   },
   actions: {
     gap: spacing.md

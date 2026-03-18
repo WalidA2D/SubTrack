@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { StatusBar } from "expo-status-bar";
 
 import { appConfig } from "./src/config/appConfig";
 import { AppNavigator } from "./src/navigation/AppNavigator";
@@ -8,6 +7,7 @@ import { useAuthStore } from "./src/store/authStore";
 import { useWorkspaceStore } from "./src/store/workspaceStore";
 
 export default function App(): JSX.Element {
+  const setAuthResolved = useAuthStore((state) => state.setAuthResolved);
   const setSession = useAuthStore((state) => state.setSession);
   const session = useAuthStore((state) => state.session);
   const loadWorkspace = useWorkspaceStore((state) => state.loadWorkspace);
@@ -15,33 +15,55 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     if (appConfig.authMode !== "firebase") {
+      setAuthResolved(true);
       return;
     }
 
+    let isMounted = true;
     let unsubscribe: (() => void) | undefined;
+    setAuthResolved(false);
 
     void (async () => {
-      const [{ onAuthStateChanged }, { firebaseAuth }] = await Promise.all([
-        import("firebase/auth"),
-        import("./src/config/firebase")
-      ]);
+      try {
+        const [{ onAuthStateChanged }, { firebaseAuth }] = await Promise.all([
+          import("firebase/auth"),
+          import("./src/config/firebase")
+        ]);
 
-      unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-        if (!user) {
-          setSession(null);
+        if (!isMounted) {
           return;
         }
 
-        setSession({
-          uid: user.uid,
-          email: user.email ?? "",
-          displayName: user.displayName ?? "Utilisateur Subly"
+        unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+          if (!isMounted) {
+            return;
+          }
+
+          if (!user) {
+            setSession(null);
+            setAuthResolved(true);
+            return;
+          }
+
+          setSession({
+            uid: user.uid,
+            email: user.email ?? "",
+            displayName: user.displayName ?? "Utilisateur Subly"
+          });
+          setAuthResolved(true);
         });
-      });
+      } catch {
+        if (isMounted) {
+          setAuthResolved(true);
+        }
+      }
     })();
 
-    return () => unsubscribe?.();
-  }, [setSession]);
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
+  }, [setAuthResolved, setSession]);
 
   useEffect(() => {
     if (!session) {
@@ -54,7 +76,6 @@ export default function App(): JSX.Element {
 
   return (
     <AppProviders>
-      <StatusBar style="light" />
       <AppNavigator />
     </AppProviders>
   );

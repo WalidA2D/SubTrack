@@ -71,6 +71,17 @@ export const generatePaymentHistory = onSchedule(
   }
 );
 
+export const purgeDeletedAccounts = onSchedule(
+  {
+    schedule: "every day 03:15",
+    timeZone: "Etc/UTC",
+    region: "europe-west1"
+  },
+  async () => {
+    await userService.purgeArchivedAccounts();
+  }
+);
+
 export const syncUserProfile = functionsV1.auth.user().onCreate(async (user) => {
   await userService.provisionUserProfile(user);
 });

@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
+import { useAppTranslation } from "../../i18n";
 import { authService } from "../../services/authService";
-import { colors, radius, spacing } from "../../theme";
+import { AppTheme, radius, spacing, useAppTheme } from "../../theme";
 
 export function AuthScreen(): JSX.Element {
-  const { width } = useWindowDimensions();
-  const isCompact = width < 380;
+  const theme = useAppTheme();
+  const { t } = useAppTranslation();
+  const styles = createStyles(theme);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [displayName, setDisplayName] = useState("Nouveau membre");
-  const [email, setEmail] = useState("demo@subly.app");
-  const [password, setPassword] = useState("StrongPass!123");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -26,8 +28,8 @@ export function AuthScreen(): JSX.Element {
       }
     } catch (error) {
       Alert.alert(
-        "Connexion impossible",
-        error instanceof Error ? error.message : "Merci de reessayer."
+        t("auth.loginErrorTitle"),
+        error instanceof Error ? error.message : t("common.retry")
       );
     } finally {
       setIsSubmitting(false);
@@ -37,46 +39,34 @@ export function AuthScreen(): JSX.Element {
   const handleResetPassword = async () => {
     try {
       await authService.sendPasswordReset(email.trim());
-      Alert.alert(
-        "Email envoye",
-        "Verifie ta boite mail pour reinitialiser ton mot de passe."
-      );
+      Alert.alert(t("auth.resetSentTitle"), t("auth.resetSentBody"));
     } catch (error) {
       Alert.alert(
-        "Impossible d'envoyer l'email",
-        error instanceof Error ? error.message : "Merci de reessayer."
+        t("auth.resetErrorTitle"),
+        error instanceof Error ? error.message : t("common.retry")
       );
     }
   };
 
   return (
     <Screen
-      title={isRegisterMode ? "Creer ton espace premium" : "Heureux de te revoir"}
-      subtitle="Connexion securisee pour retrouver tous tes abonnements. Compte de test precharge : demo@subly.app"
+      title={isRegisterMode ? t("auth.registerTitle") : t("auth.loginTitle")}
+      subtitle={t("auth.subtitle")}
     >
-      <View style={[styles.heroStrip, isCompact ? styles.heroStripCompact : null]}>
-        <View style={styles.heroMetric}>
-          <Text style={styles.heroMetricLabel}>Compte test</Text>
-          <Text style={styles.heroMetricValue}>demo@subly.app</Text>
-        </View>
-        <View style={styles.heroMetric}>
-          <Text style={styles.heroMetricLabel}>Mot de passe</Text>
-          <Text style={styles.heroMetricValue}>StrongPass!123</Text>
-        </View>
-      </View>
       <View style={styles.card}>
         {isRegisterMode ? (
           <TextInput
-            placeholder="Nom d'affichage"
-            placeholderTextColor={colors.textSecondary}
+            placeholder={t("auth.displayNamePlaceholder")}
+            placeholderTextColor={theme.colors.textSecondary}
             style={styles.input}
             value={displayName}
             onChangeText={setDisplayName}
+            autoCapitalize="words"
           />
         ) : null}
         <TextInput
-          placeholder="Adresse email"
-          placeholderTextColor={colors.textSecondary}
+          placeholder={t("auth.emailPlaceholder")}
+          placeholderTextColor={theme.colors.textSecondary}
           autoCapitalize="none"
           keyboardType="email-address"
           style={styles.input}
@@ -84,21 +74,21 @@ export function AuthScreen(): JSX.Element {
           onChangeText={setEmail}
         />
         <TextInput
-          placeholder="Mot de passe"
-          placeholderTextColor={colors.textSecondary}
+          placeholder={t("auth.passwordPlaceholder")}
+          placeholderTextColor={theme.colors.textSecondary}
           secureTextEntry
           style={styles.input}
           value={password}
           onChangeText={setPassword}
         />
         <PrimaryButton
-          title={isRegisterMode ? "Creer mon compte" : "Se connecter"}
+          title={isRegisterMode ? t("auth.createAccount") : t("auth.signIn")}
           onPress={handleSubmit}
           disabled={isSubmitting}
         />
         {!isRegisterMode ? (
           <PrimaryButton
-            title="Mot de passe oublie"
+            title={t("auth.forgotPassword")}
             onPress={handleResetPassword}
             variant="secondary"
           />
@@ -107,74 +97,47 @@ export function AuthScreen(): JSX.Element {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          {isRegisterMode ? "Tu as deja un compte ?" : "Pas encore de compte ?"}
+          {isRegisterMode ? t("auth.haveAccount") : t("auth.noAccount")}
         </Text>
         <Text style={styles.switch} onPress={() => setIsRegisterMode((value) => !value)}>
-          {isRegisterMode ? "Se connecter a la place" : "En creer un"}
+          {isRegisterMode ? t("auth.signInInstead") : t("auth.createOne")}
         </Text>
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  heroStrip: {
-    flexDirection: "row",
-    gap: spacing.md
-  },
-  heroStripCompact: {
-    flexDirection: "column"
-  },
-  heroMetric: {
-    flex: 1,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: 6
-  },
-  heroMetricLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    color: colors.textTertiary
-  },
-  heroMetricValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textPrimary
-  },
-  card: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border
-  },
-  input: {
-    minHeight: 54,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingHorizontal: spacing.md,
-    fontSize: 16,
-    color: colors.textPrimary,
-    backgroundColor: colors.surface
-  },
-  footer: {
-    alignItems: "center",
-    gap: spacing.xs
-  },
-  footerText: {
-    fontSize: 14,
-    color: colors.textSecondary
-  },
-  switch: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.primary
-  }
-});
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: theme.colors.surfaceRaised,
+      borderRadius: radius.md,
+      padding: spacing.lg,
+      gap: spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    input: {
+      minHeight: 54,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      paddingHorizontal: spacing.md,
+      fontSize: 16,
+      color: theme.colors.textPrimary,
+      backgroundColor: theme.colors.surface
+    },
+    footer: {
+      alignItems: "center",
+      gap: spacing.xs
+    },
+    footerText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary
+    },
+    switch: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.colors.primary
+    }
+  });

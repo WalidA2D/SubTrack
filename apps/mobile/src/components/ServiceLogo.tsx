@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
-import { findServicePresetByProvider, normalizeCatalogKey } from "@subly/shared";
+import {
+  findServicePlanOption,
+  findServicePlanPresetByProvider,
+  findServicePresetByProvider,
+  normalizeCatalogKey,
+  type SubscriptionLogoMode
+} from "@subly/shared";
 
 import { colors } from "../theme";
 import {
@@ -11,6 +17,7 @@ import {
 type ServiceLogoProps = {
   providerName: string;
   size?: number;
+  logoMode?: SubscriptionLogoMode;
 };
 
 type LogoConfig = {
@@ -28,7 +35,15 @@ type ImagePlateTheme = {
 
 const LOGO_CONFIGS: Record<string, LogoConfig> = {
   chatgpt: { label: "AI", background: "#FFFFFF", foreground: "#12151C", border: "#E5E7EB", fontScale: 0.26 },
+  chatgpt_plus: { label: "+", background: "#EAFBF3", foreground: "#0F6D47", border: "#C8EEDA", fontScale: 0.42 },
+  chatgpt_business: { label: "Biz", background: "#EEF3FA", foreground: "#284B6E", border: "#D6E1EE", fontScale: 0.18 },
+  chatgpt_pro: { label: "Pro", background: "#111317", foreground: "#E6FFF5", border: "#313741", fontScale: 0.16 },
   claude: { label: "C", background: "#E77344", foreground: "#FFF5EF", border: "#F09167", fontScale: 0.42 },
+  claude_free: { label: "Fr", background: "#F5EDE4", foreground: "#915534", border: "#E6D5C4", fontScale: 0.22 },
+  claude_pro: { label: "Pro", background: "#E77344", foreground: "#FFF5EF", border: "#F09167", fontScale: 0.18 },
+  claude_max: { label: "Max", background: "#17181D", foreground: "#F6E7D9", border: "#363B45", fontScale: 0.16 },
+  claude_team: { label: "Tm", background: "#EAF4EE", foreground: "#326446", border: "#CEE1D5", fontScale: 0.2 },
+  claude_enterprise: { label: "Ent", background: "#EEF1F6", foreground: "#314B67", border: "#D5DEE8", fontScale: 0.14 },
   google_gemini: { label: "G", background: "#FFFFFF", foreground: "#7C6DFF", border: "#E3E5F5", fontScale: 0.42 },
   microsoft_copilot: { label: "Co", background: "#FFF6E8", foreground: "#111827", border: "#F0D8AF", fontScale: 0.24 },
   perplexity_ai: { label: "P", background: "#101114", foreground: "#F3F4F6", border: "#2D3342", fontScale: 0.4 },
@@ -37,6 +52,16 @@ const LOGO_CONFIGS: Record<string, LogoConfig> = {
   youtube: { label: "YT", background: "#FFFFFF", foreground: "#FF1F3D", border: "#E5E7EB", fontScale: 0.24 },
   amazon_prime: { label: "P", background: "#1877F2", foreground: "#EAF3FF", border: "#2F86FF", fontScale: 0.4 },
   disney_plus: { label: "D+", background: "#0C1F52", foreground: "#F5F7FA", border: "#213A7A", fontScale: 0.32 },
+  disneyland_pass: { label: "D", background: "#102649", foreground: "#F8E7AE", border: "#294571", fontScale: 0.34 },
+  disneyland_pass_bronze_one: { label: "B1", background: "#2C201A", foreground: "#E5B78B", border: "#604433", fontScale: 0.24 },
+  disneyland_pass_bronze_max: { label: "BM", background: "#2B1D17", foreground: "#E8BA91", border: "#654535", fontScale: 0.18 },
+  disneyland_pass_bronze: { label: "B", background: "#2A211B", foreground: "#D0A27A", border: "#5D4838", fontScale: 0.32 },
+  disneyland_pass_silver: { label: "S", background: "#20242C", foreground: "#E7E9F0", border: "#505B6A", fontScale: 0.32 },
+  disneyland_pass_gold: { label: "G", background: "#2E2614", foreground: "#F4D06A", border: "#6D5623", fontScale: 0.32 },
+  parc_asterix_pass: { label: "PA", background: "#101A2E", foreground: "#F6D25E", border: "#2F4268", fontScale: 0.2 },
+  parc_asterix_pass_decouverte: { label: "D", background: "#18253B", foreground: "#F2E27A", border: "#34496E", fontScale: 0.32 },
+  parc_asterix_pass_gaulois: { label: "G", background: "#382312", foreground: "#FFD082", border: "#6F4A28", fontScale: 0.32 },
+  parc_asterix_pass_premium: { label: "P", background: "#3B1836", foreground: "#FFD8F8", border: "#70406A", fontScale: 0.32 },
   hulu: { label: "h", background: "#0B1813", foreground: "#1CE783", border: "#224133", fontScale: 0.42 },
   hbo_max: { label: "max", background: "#101422", foreground: "#F4F2FF", border: "#252D46", fontScale: 0.18 },
   apple_tv_plus: { label: "tv", background: "#171717", foreground: "#F5F7FA", border: "#313131", fontScale: 0.24 },
@@ -59,6 +84,9 @@ const LOGO_CONFIGS: Record<string, LogoConfig> = {
   geforce_now: { label: "GF", background: "#090F08", foreground: "#76B900", border: "#223819", fontScale: 0.2 },
   notion: { label: "N", background: "#F5F5F4", foreground: "#111111", border: "#DDDDDD", fontScale: 0.44 },
   slack: { label: "S", background: "#F8F8FB", foreground: "#4A154B", border: "#E2E2EF", fontScale: 0.36 },
+  discord: { label: "D", background: "#5865F2", foreground: "#F5F7FF", border: "#7A84FF", fontScale: 0.38 },
+  x: { label: "X", background: "#111111", foreground: "#F5F7FA", border: "#2F3338", fontScale: 0.38 },
+  snapchat: { label: "S", background: "#FFFC00", foreground: "#111111", border: "#E2DD40", fontScale: 0.38 },
   jira: { label: "J", background: "#EAF1FF", foreground: "#1868DB", border: "#CDDCF8", fontScale: 0.38 },
   trello: { label: "T", background: "#EAF4FF", foreground: "#0C66E4", border: "#D3E5FA", fontScale: 0.38 },
   zoom_pro: { label: "Zm", background: "#0B5CFF", foreground: "#F4F8FF", border: "#2670FF", fontScale: 0.22 },
@@ -91,6 +119,10 @@ const LOGO_CONFIGS: Record<string, LogoConfig> = {
   robinhood_gold: { label: "R", background: "#D7FF00", foreground: "#121816", border: "#EAFF6A", fontScale: 0.38 },
   monzo_plus: { label: "M", background: "#173E52", foreground: "#EAF9FF", border: "#295874", fontScale: 0.38 },
   revolut: { label: "R", background: "#F7F7F7", foreground: "#131313", border: "#E3E3E3", fontScale: 0.38 },
+  revolut_plus: { label: "P", background: "#FFEEF9", foreground: "#D61F7D", border: "#FFC5E5", fontScale: 0.34 },
+  revolut_premium: { label: "Pr", background: "#ECF6F0", foreground: "#537B63", border: "#CFE3D7", fontScale: 0.18 },
+  revolut_metal: { label: "M", background: "#171717", foreground: "#F3F4F6", border: "#313131", fontScale: 0.34 },
+  revolut_ultra: { label: "U", background: "#F3F3F3", foreground: "#505050", border: "#DADADA", fontScale: 0.34 },
   codecademy: { label: "C", background: "#151B44", foreground: "#F0F4FF", border: "#283163", fontScale: 0.38 },
   babbel: { label: "B", background: "#FF6A00", foreground: "#FFF5EC", border: "#FF8D34", fontScale: 0.38 },
   rosetta_stone: { label: "R", background: "#FFC61A", foreground: "#17314B", border: "#FFD35C", fontScale: 0.38 },
@@ -145,6 +177,8 @@ const OFFICIAL_LOGO_HOSTS: Record<string, string> = {
   youtube: "www.youtube.com",
   amazon_prime: "www.primevideo.com",
   disney_plus: "www.disneyplus.com",
+  disneyland_pass: "www.disneylandparis.com",
+  parc_asterix_pass: "www.parcasterix.fr",
   hulu: "www.hulu.com",
   hbo_max: "play.max.com",
   apple_tv_plus: "tv.apple.com",
@@ -167,6 +201,9 @@ const OFFICIAL_LOGO_HOSTS: Record<string, string> = {
   geforce_now: "play.geforcenow.com",
   notion: "www.notion.so",
   slack: "slack.com",
+  discord: "discord.com",
+  x: "x.com",
+  snapchat: "www.snapchat.com",
   jira: "www.atlassian.com",
   trello: "trello.com",
   zoom_pro: "zoom.us",
@@ -269,11 +306,19 @@ const IMAGE_PLATE_THEMES: Record<string, ImagePlateTheme> = {
 
 export function ServiceLogo({
   providerName,
-  size = 48
+  size = 48,
+  logoMode = "option"
 }: ServiceLogoProps): JSX.Element {
   const preset = findServicePresetByProvider(providerName);
+  const servicePlanPreset = findServicePlanPresetByProvider(providerName);
+  const servicePlanOption = findServicePlanOption(providerName);
   const providerKey = normalizeCatalogKey(providerName);
-  const logoKey = preset?.id ?? providerKey;
+  const shouldUsePlanSpecificLogo = logoMode !== "base";
+  const logoKey = shouldUsePlanSpecificLogo && servicePlanOption
+    ? servicePlanPreset?.presetId === "parc_asterix_pass"
+      ? `parc_asterix_pass_${servicePlanOption.id}`
+      : providerKey
+    : servicePlanPreset?.presetId ?? preset?.id ?? providerKey;
   const palette = getSubscriptionPalette(providerName);
   const [didImageFail, setDidImageFail] = useState(false);
 
@@ -297,6 +342,18 @@ export function ServiceLogo({
   };
 
   const logoUri = useMemo(() => {
+    if (shouldUsePlanSpecificLogo && servicePlanOption?.logoUri) {
+      return servicePlanOption.logoUri;
+    }
+
+    if (logoKey === "disneyland_pass") {
+      return "https://www.disneylandparis.com/static/favicons/1.0.0/apple-icon-180x180.png";
+    }
+
+    if (logoKey === "parc_asterix_pass") {
+      return "https://newsroom.parcasterix.fr/wp-content/themes/asterix/assets/img/logo/svg/logo-asterix.png";
+    }
+
     const host = OFFICIAL_LOGO_HOSTS[logoKey];
 
     if (!host) {
@@ -306,12 +363,19 @@ export function ServiceLogo({
     return `https://www.google.com/s2/favicons?sz=128&domain_url=${encodeURIComponent(
       `https://${host}`
     )}`;
-  }, [logoKey]);
+  }, [logoKey, servicePlanOption, shouldUsePlanSpecificLogo]);
 
   const imageSize = Math.round(size * 0.68);
   const imagePlateSize = Math.round(size * 0.76);
   const imagePlateTheme = IMAGE_PLATE_THEMES[logoKey] ?? DEFAULT_IMAGE_PLATE;
   const isUsingRemoteLogo = Boolean(logoUri && !didImageFail);
+  const isFullBleedImage = Boolean(
+    shouldUsePlanSpecificLogo &&
+      servicePlanOption?.logoUri &&
+      (servicePlanPreset?.presetId === "disneyland_pass" ||
+        servicePlanPreset?.presetId === "parc_asterix_pass" ||
+        servicePlanPreset?.presetId === "revolut")
+  );
 
   return (
     <View
@@ -326,25 +390,33 @@ export function ServiceLogo({
     >
       {isUsingRemoteLogo ? (
         <View
-          style={[
-            styles.imagePlate,
-            {
-              width: imagePlateSize,
-              height: imagePlateSize,
-              borderRadius: Math.round(imagePlateSize * 0.28),
-              backgroundColor: imagePlateTheme.background,
-              borderColor: imagePlateTheme.border
-            }
-          ]}
+          style={
+            isFullBleedImage
+              ? [styles.fullBleedWrap, { borderRadius: Math.round(size * 0.28) }]
+              : [
+                  styles.imagePlate,
+                  {
+                    width: imagePlateSize,
+                    height: imagePlateSize,
+                    borderRadius: Math.round(imagePlateSize * 0.28),
+                    backgroundColor: imagePlateTheme.background,
+                    borderColor: imagePlateTheme.border
+                  }
+                ]
+          }
         >
           <Image
             source={{ uri: logoUri! }}
-            style={{
-              width: imageSize,
-              height: imageSize,
-              borderRadius: Math.round(imageSize * 0.22)
-            }}
-            resizeMode="contain"
+            style={
+              isFullBleedImage
+                ? styles.fullBleedImage
+                : {
+                    width: imageSize,
+                    height: imageSize,
+                    borderRadius: Math.round(imageSize * 0.22)
+                  }
+            }
+            resizeMode={isFullBleedImage ? "cover" : "contain"}
             onError={() => setDidImageFail(true)}
           />
         </View>
@@ -376,6 +448,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1
+  },
+  fullBleedWrap: {
+    width: "100%",
+    height: "100%",
+    overflow: "hidden"
+  },
+  fullBleedImage: {
+    width: "100%",
+    height: "100%"
   },
   logoLabel: {
     fontWeight: "800",

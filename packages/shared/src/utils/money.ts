@@ -5,6 +5,10 @@ export function toMonthlyAmount(price: number, frequency: BillingFrequency): num
     return roundToTwo(price * 52 / 12);
   }
 
+  if (frequency === "quarterly") {
+    return roundToTwo(price / 3);
+  }
+
   if (frequency === "yearly") {
     return roundToTwo(price / 12);
   }
@@ -15,6 +19,10 @@ export function toMonthlyAmount(price: number, frequency: BillingFrequency): num
 export function toYearlyAmount(price: number, frequency: BillingFrequency): number {
   if (frequency === "weekly") {
     return roundToTwo(price * 52);
+  }
+
+  if (frequency === "quarterly") {
+    return roundToTwo(price * 4);
   }
 
   if (frequency === "monthly") {

@@ -41,6 +41,11 @@ export type StatisticsOverview = {
   }>;
 };
 
+export type AccountDeletionRequestResponse = {
+  deletionRequestedAt: string;
+  deletionScheduledFor: string;
+};
+
 type DataResponse<T> = {
   data: T;
 };
@@ -63,6 +68,17 @@ export const sublyApi = {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
+
+    return response.data;
+  },
+
+  async requestAccountDeletion() {
+    const response = await apiRequest<DataResponse<AccountDeletionRequestResponse>>(
+      "/settings/account-deletion",
+      {
+        method: "POST"
+      }
+    );
 
     return response.data;
   },

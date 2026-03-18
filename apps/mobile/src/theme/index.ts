@@ -1,4 +1,6 @@
-export const colors = {
+import { createContext, useContext } from "react";
+
+const defaultColors = {
   primary: "#FFB84D",
   primaryStrong: "#FF9A3C",
   secondary: "#8C7BFF",
@@ -21,6 +23,32 @@ export const colors = {
   glowGreen: "rgba(69, 212, 139, 0.18)",
   white: "#FFFFFF"
 };
+
+const colorBlindColors = {
+  primary: "#E69F00",
+  primaryStrong: "#C68500",
+  secondary: "#0072B2",
+  success: "#009E73",
+  warning: "#F0E442",
+  danger: "#D55E00",
+  background: "#071018",
+  backgroundElevated: "#0D1722",
+  surface: "#122131",
+  surfaceRaised: "#172A3F",
+  surfaceMuted: "#1D3550",
+  surfaceContrast: "#244663",
+  textPrimary: "#F6F9FC",
+  textSecondary: "#BDD0E3",
+  textTertiary: "#88A2BB",
+  border: "#244158",
+  borderStrong: "#335778",
+  glowOrange: "rgba(230, 159, 0, 0.2)",
+  glowPurple: "rgba(0, 114, 178, 0.18)",
+  glowGreen: "rgba(0, 158, 115, 0.18)",
+  white: "#FFFFFF"
+};
+
+export const colors = defaultColors;
 
 export const spacing = {
   xs: 8,
@@ -61,3 +89,50 @@ export const shadows = {
     elevation: 8
   }
 };
+
+type ThemeColors = typeof defaultColors;
+
+export type AppTheme = {
+  colors: ThemeColors;
+  chartColors: string[];
+  colorBlindMode: boolean;
+  statusBarStyle: "light" | "dark";
+};
+
+const defaultTheme: AppTheme = {
+  colors: defaultColors,
+  chartColors: [
+    defaultColors.primary,
+    defaultColors.secondary,
+    defaultColors.success,
+    defaultColors.danger,
+    "#7BE7FF",
+    "#F38BFF"
+  ],
+  colorBlindMode: false,
+  statusBarStyle: "light"
+};
+
+const colorBlindTheme: AppTheme = {
+  colors: colorBlindColors,
+  chartColors: [
+    colorBlindColors.primary,
+    colorBlindColors.secondary,
+    colorBlindColors.success,
+    colorBlindColors.danger,
+    "#56B4E9",
+    "#F0E442"
+  ],
+  colorBlindMode: true,
+  statusBarStyle: "light"
+};
+
+export const AppThemeContext = createContext<AppTheme>(defaultTheme);
+
+export function getAppTheme(colorBlindMode: boolean): AppTheme {
+  return colorBlindMode ? colorBlindTheme : defaultTheme;
+}
+
+export function useAppTheme(): AppTheme {
+  return useContext(AppThemeContext);
+}

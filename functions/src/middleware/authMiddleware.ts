@@ -42,6 +42,7 @@ export async function authenticateRequest(
         email: mockEmail,
         displayName: mockDisplayName
       });
+      await userService.assertAccountAccessible(mockUserId);
 
       (req as AuthenticatedRequest).user = {
         uid: mockUserId,
@@ -61,6 +62,14 @@ export async function authenticateRequest(
 
     const token = authorization.replace("Bearer ", "");
     const decodedToken = await adminAuth.verifyIdToken(token);
+    const userRecord = await adminAuth.getUser(decodedToken.uid);
+
+    if (userRecord.disabled) {
+      throw new ApiError(
+        403,
+        "Ce compte est desactive ou en attente de suppression."
+      );
+    }
 
     await userService.provisionUserProfile({
       uid: decodedToken.uid,
@@ -68,6 +77,7 @@ export async function authenticateRequest(
       displayName: decodedToken.name,
       photoURL: typeof decodedToken.picture === "string" ? decodedToken.picture : null
     });
+    await userService.assertAccountAccessible(decodedToken.uid);
 
     (req as AuthenticatedRequest).user = {
       uid: decodedToken.uid,

@@ -1,21 +1,33 @@
 import { PropsWithChildren, ReactNode } from "react";
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions
+} from "react-native";
 
 import { BrandLogo } from "./BrandLogo";
-import { colors, spacing } from "../theme";
+import { AppTheme, spacing, useAppTheme } from "../theme";
 
 type ScreenProps = PropsWithChildren<{
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  onScrollBeginDrag?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }>;
 
 export function Screen({
   title,
   subtitle,
   action,
+  onScrollBeginDrag,
   children
 }: ScreenProps): JSX.Element {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
   const isTablet = width >= 768;
@@ -37,6 +49,7 @@ export function Screen({
           }
         ]}
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={onScrollBeginDrag}
       >
         <View style={[styles.header, isCompact ? styles.headerCompact : null]}>
           <View style={styles.headerText}>
@@ -52,63 +65,64 @@ export function Screen({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
-  backgroundLayer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: "hidden"
-  },
-  glow: {
-    position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 999
-  },
-  glowOrange: {
-    top: -70,
-    right: -60,
-    backgroundColor: colors.glowOrange
-  },
-  glowPurple: {
-    top: 170,
-    left: -110,
-    backgroundColor: colors.glowPurple
-  },
-  content: {
-    paddingTop: spacing.xxxl,
-    paddingBottom: spacing.xxxl + 70,
-    gap: spacing.lg,
-    width: "100%"
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md
-  },
-  headerCompact: {
-    flexDirection: "column",
-    alignItems: "stretch"
-  },
-  headerText: {
-    flex: 1,
-    gap: spacing.xs
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: colors.textPrimary
-  },
-  titleCompact: {
-    fontSize: 28,
-    lineHeight: 34
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.textSecondary
-  }
-});
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background
+    },
+    backgroundLayer: {
+      ...StyleSheet.absoluteFillObject,
+      overflow: "hidden"
+    },
+    glow: {
+      position: "absolute",
+      width: 240,
+      height: 240,
+      borderRadius: 999
+    },
+    glowOrange: {
+      top: -70,
+      right: -60,
+      backgroundColor: theme.colors.glowOrange
+    },
+    glowPurple: {
+      top: 170,
+      left: -110,
+      backgroundColor: theme.colors.glowPurple
+    },
+    content: {
+      paddingTop: spacing.xxxl,
+      paddingBottom: spacing.xxxl + 70,
+      gap: spacing.lg,
+      width: "100%"
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: spacing.md
+    },
+    headerCompact: {
+      flexDirection: "column",
+      alignItems: "stretch"
+    },
+    headerText: {
+      flex: 1,
+      gap: spacing.xs
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: "700",
+      color: theme.colors.textPrimary
+    },
+    titleCompact: {
+      fontSize: 28,
+      lineHeight: 34
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: theme.colors.textSecondary
+    }
+  });

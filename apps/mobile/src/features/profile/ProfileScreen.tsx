@@ -9,14 +9,17 @@ import {
   View,
   useWindowDimensions
 } from "react-native";
-import { FREE_PLAN_MAX_SUBSCRIPTIONS } from "@subly/shared";
+import {
+  FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION,
+  FREE_PLAN_MAX_SUBSCRIPTIONS
+} from "@subly/shared";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
 import { useAuthStore } from "../../store/authStore";
 import { useAppNavigation } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
-import { colors, radius, shadows, spacing } from "../../theme";
+import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
 
 type OfferPlan = {
   id: "free" | "premium_monthly" | "premium_yearly";
@@ -37,6 +40,7 @@ const OFFER_PLANS: OfferPlan[] = [
     subtitle: "Pour demarrer sans engagement",
     features: [
       `${FREE_PLAN_MAX_SUBSCRIPTIONS} abonnements`,
+      `${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus max par abonnement`,
       "Statistiques basiques",
       "Rappels simples",
       "Pub"
@@ -51,6 +55,7 @@ const OFFER_PLANS: OfferPlan[] = [
     subtitle: "Flexible et sans engagement annuel",
     features: [
       "Abonnements illimites",
+      "Services inclus illimites par abonnement",
       "Rappels avances",
       "Export PDF",
       "Pas de pub"
@@ -68,6 +73,7 @@ const OFFER_PLANS: OfferPlan[] = [
       "Tout Premium",
       "33% moins cher",
       "Abonnements illimites",
+      "Services inclus illimites par abonnement",
       "Pas de pub"
     ],
     highlight: "Meilleure offre",
@@ -80,6 +86,8 @@ export function ProfileScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
   const navigation = useAppNavigation();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const session = useAuthStore((state) => state.session);
   const profile = useWorkspaceStore((state) => state.profile);
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
@@ -123,8 +131,8 @@ export function ProfileScreen(): JSX.Element {
         <View style={styles.premiumCard}>
           <Text style={styles.premiumTitle}>Passe au niveau Premium</Text>
           <Text style={styles.premiumBody}>
-            Debloque les abonnements illimites, des rappels personnalises, l'export PDF et
-            une experience sans pub.
+            Debloque les abonnements illimites, les services inclus illimites par abonnement,
+            des rappels personnalises, l'export PDF et une experience sans pub.
           </Text>
           <PrimaryButton
             title="Passer au Premium"
@@ -222,14 +230,14 @@ export function ProfileScreen(): JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
   },
   avatar: {
     width: 76,
@@ -237,27 +245,27 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceContrast,
+    backgroundColor: theme.colors.surfaceContrast,
     borderWidth: 1,
-    borderColor: colors.borderStrong
+    borderColor: theme.colors.borderStrong
   },
   avatarLabel: {
     fontSize: 24,
     fontWeight: "800",
-    color: colors.primary
+    color: theme.colors.primary
   },
   name: {
     fontSize: 22,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   email: {
     fontSize: 15,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   meta: {
     fontSize: 14,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   badge: {
     alignSelf: "flex-start",
@@ -265,15 +273,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 999,
-    backgroundColor: colors.surfaceContrast
+    backgroundColor: theme.colors.surfaceContrast
   },
   badgeText: {
     fontSize: 13,
     fontWeight: "700",
-    color: colors.primary
+    color: theme.colors.primary
   },
   premiumCard: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.md,
@@ -283,12 +291,12 @@ const styles = StyleSheet.create({
   premiumTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   premiumBody: {
     fontSize: 15,
     lineHeight: 22,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   modalRoot: {
     flex: 1,
@@ -300,14 +308,14 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: "88%",
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: theme.colors.backgroundElevated,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: theme.colors.borderStrong,
     ...shadows.card
   },
   sheetCompact: {
@@ -328,23 +336,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    color: colors.primary
+    color: theme.colors.primary
   },
   sheetTitle: {
     fontSize: 30,
     fontWeight: "800",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   sheetOr: {
     fontSize: 13,
     fontWeight: "700",
-    color: colors.textTertiary,
+    color: theme.colors.textTertiary,
     textTransform: "uppercase"
   },
   sheetTitleSecondary: {
     fontSize: 24,
     fontWeight: "800",
-    color: colors.secondary
+    color: theme.colors.secondary
   },
   closeButton: {
     width: 34,
@@ -352,20 +360,20 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
   },
   closeButtonLabel: {
     fontSize: 13,
     fontWeight: "800",
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   sheetSubtitle: {
     marginTop: spacing.sm,
     fontSize: 14,
     lineHeight: 20,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   offerList: {
     paddingTop: spacing.lg,
@@ -373,12 +381,12 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm
   },
   offerCard: {
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.colors.border
   },
   offerCardOrange: {
     borderColor: "rgba(255, 184, 77, 0.34)",
@@ -401,16 +409,16 @@ const styles = StyleSheet.create({
   offerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   offerPrice: {
     fontSize: 18,
     fontWeight: "800",
-    color: colors.primary
+    color: theme.colors.primary
   },
   offerSubtitle: {
     fontSize: 13,
-    color: colors.textSecondary
+    color: theme.colors.textSecondary
   },
   offerBadge: {
     paddingHorizontal: spacing.sm,
@@ -428,7 +436,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.5,
     textTransform: "uppercase",
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   },
   featureList: {
     gap: spacing.sm
@@ -442,17 +450,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 999,
-    backgroundColor: colors.textTertiary
+    backgroundColor: theme.colors.textTertiary
   },
   featureDotOrange: {
-    backgroundColor: colors.primary
+    backgroundColor: theme.colors.primary
   },
   featureDotPurple: {
-    backgroundColor: colors.secondary
+    backgroundColor: theme.colors.secondary
   },
   featureText: {
     flex: 1,
     fontSize: 15,
-    color: colors.textPrimary
+    color: theme.colors.textPrimary
   }
 });

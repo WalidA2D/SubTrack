@@ -11,6 +11,10 @@ export function addBillingCycle(dateIso: string, frequency: BillingFrequency): s
     date.setMonth(date.getMonth() + 1);
   }
 
+  if (frequency === "quarterly") {
+    date.setMonth(date.getMonth() + 3);
+  }
+
   if (frequency === "yearly") {
     date.setFullYear(date.getFullYear() + 1);
   }

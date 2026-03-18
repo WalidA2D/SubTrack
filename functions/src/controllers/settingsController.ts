@@ -19,3 +19,10 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
 
   res.json({ data });
 });
+
+export const requestAccountDeletion = asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const data = await userService.requestAccountDeletion(authReq.user.uid);
+
+  res.status(202).json({ data });
+});

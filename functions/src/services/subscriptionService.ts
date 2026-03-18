@@ -4,6 +4,7 @@ import {
 } from "firebase-admin/firestore";
 import {
   findCategoryPresetByName,
+  FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION,
   FREE_PLAN_MAX_SUBSCRIPTIONS,
   Subscription,
   SubscriptionInput,
@@ -27,8 +28,41 @@ function countsTowardLimit(status: Subscription["status"]): boolean {
   return status === "active" || status === "trial";
 }
 
+function sanitizeLogoMode(value: unknown): Subscription["logoMode"] {
+  return value === "base" ? "base" : "option";
+}
+
 function mapSubscription(data: FirebaseFirestore.DocumentData): Subscription {
-  return data as Subscription;
+  return {
+    ...data,
+    logoMode: sanitizeLogoMode(data.logoMode),
+    includedProviderNames: sanitizeIncludedProviderNames(
+      String(data.providerName ?? ""),
+      Array.isArray(data.includedProviderNames) ? data.includedProviderNames : []
+    )
+  } as Subscription;
+}
+
+function sanitizeIncludedProviderNames(
+  providerName: string,
+  includedProviderNames: string[]
+) {
+  const currentProviderKey = normalizeProviderName(providerName);
+  const seen = new Set<string>();
+
+  return includedProviderNames
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .filter((value) => {
+      const normalized = normalizeProviderName(value);
+
+      if (!normalized || normalized === currentProviderKey || seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    });
 }
 
 async function getOwnedSubscriptions(userId: string): Promise<Subscription[]> {
@@ -58,12 +92,35 @@ async function ensureCanCreateSubscription(userId: string) {
   }
 }
 
+async function ensureIncludedProviderLimit(userId: string, includedProviderCount: number) {
+  const userSnapshot = await usersCollection.doc(userId).get();
+
+  if (!userSnapshot.exists) {
+    throw new ApiError(404, "Profil utilisateur introuvable.");
+  }
+
+  const profile = userSnapshot.data() as {
+    planTier?: "free" | "premium";
+  };
+
+  if (
+    (profile.planTier ?? "free") === "free" &&
+    includedProviderCount > FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION
+  ) {
+    throw new ApiError(
+      403,
+      `Le plan gratuit permet jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus par abonnement. Passe au Premium pour en associer autant que tu veux.`
+    );
+  }
+}
+
 function buildSubscriptionRecord(
   userId: string,
   payload: SubscriptionInput,
   existing?: Subscription
 ): Subscription {
   const now = new Date().toISOString();
+  const providerName = payload.providerName ?? existing?.providerName ?? "";
   const price = payload.price ?? existing?.price ?? 0;
   const billingFrequency = payload.billingFrequency ?? existing?.billingFrequency ?? "monthly";
   const status = payload.status ?? existing?.status ?? (payload.trialEndsAt ? "trial" : "active");
@@ -71,10 +128,15 @@ function buildSubscriptionRecord(
   return {
     id: existing?.id ?? randomUUID(),
     userId,
-    providerName: payload.providerName ?? existing?.providerName ?? "",
+    providerName,
     normalizedProviderName: normalizeProviderName(
-      payload.providerName ?? existing?.providerName ?? ""
+      providerName
     ),
+    includedProviderNames: sanitizeIncludedProviderNames(
+      providerName,
+      payload.includedProviderNames ?? existing?.includedProviderNames ?? []
+    ),
+    logoMode: sanitizeLogoMode(payload.logoMode ?? existing?.logoMode),
     categoryId: payload.categoryId ?? existing?.categoryId ?? "",
     categoryName: payload.categoryName ?? existing?.categoryName ?? "",
     price,
@@ -197,6 +259,8 @@ export const subscriptionService = {
       await ensureCanCreateSubscription(userId);
     }
 
+    await ensureIncludedProviderLimit(userId, subscription.includedProviderNames.length);
+
     await ensureCategoryDocument(userId, subscription.categoryId, subscription.categoryName);
     await subscriptionsCollection.doc(subscription.id).set(subscription);
 
@@ -225,6 +289,8 @@ export const subscriptionService = {
     if (!before && after) {
       await ensureCanCreateSubscription(userId);
     }
+
+    await ensureIncludedProviderLimit(userId, updated.includedProviderNames.length);
 
     await ensureCategoryDocument(userId, updated.categoryId, updated.categoryName);
     await subscriptionsCollection.doc(subscriptionId).set(updated, { merge: true });

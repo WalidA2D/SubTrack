@@ -83,6 +83,31 @@ export const authService = {
     return sendPasswordResetEmail(firebaseAuth, email);
   },
 
+  async changePassword(currentPassword: string, nextPassword: string) {
+    if (appConfig.authMode === "mock") {
+      return Promise.resolve();
+    }
+
+    const [
+      {
+        EmailAuthProvider,
+        reauthenticateWithCredential,
+        updatePassword
+      },
+      { firebaseAuth }
+    ] = await Promise.all([import("firebase/auth"), import("../config/firebase")]);
+
+    const currentUser = firebaseAuth.currentUser;
+
+    if (!currentUser?.email) {
+      throw new Error("Impossible de retrouver ton compte actuel.");
+    }
+
+    const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+    await reauthenticateWithCredential(currentUser, credential);
+    await updatePassword(currentUser, nextPassword);
+  },
+
   async signOut() {
     if (appConfig.authMode === "mock") {
       useAuthStore.getState().signOutLocally();
