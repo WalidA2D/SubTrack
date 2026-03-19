@@ -1,6 +1,8 @@
 {
   "projects": {
     "default": "subly-dev",
+    "online": "subtrack-fb908",
+    "emulator": "subly-dev",
     "production": "subly-prod"
   }
 }

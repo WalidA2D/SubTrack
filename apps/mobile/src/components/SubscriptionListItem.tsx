@@ -23,6 +23,7 @@ type SubscriptionListItemProps = {
   isDueSoon?: boolean;
   isIncludedLink?: boolean;
   linkedParentProviderNames?: string[];
+  linkedParentSubscriptions?: Array<Pick<Subscription, "id" | "providerName" | "logoMode">>;
 };
 
 export function SubscriptionListItem({
@@ -34,7 +35,8 @@ export function SubscriptionListItem({
   isArchiving = false,
   isDueSoon = false,
   isIncludedLink = false,
-  linkedParentProviderNames
+  linkedParentProviderNames,
+  linkedParentSubscriptions
 }: SubscriptionListItemProps): JSX.Element {
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
@@ -60,6 +62,7 @@ export function SubscriptionListItem({
     isIncludedLink ? styles.metaIncludedLink : null,
     isDueSoon ? styles.metaDueSoon : null
   ];
+  const primaryLinkedParent = linkedParentSubscriptions?.[0] ?? null;
   const linkedParentText = linkedParentProviderNames?.join(", ") ?? "";
   const sublineText = isIncludedLink
     ? `Inclus via ${linkedParentText || "un autre abonnement"}`
@@ -117,11 +120,22 @@ export function SubscriptionListItem({
     >
       <View style={[styles.row, isCompact ? styles.rowCompact : null]}>
         <View style={styles.identityRow}>
-          <ServiceLogo
-            providerName={subscription.providerName}
-            logoMode={subscription.logoMode}
-            size={52}
-          />
+          <View style={styles.logoWrap}>
+            <ServiceLogo
+              providerName={subscription.providerName}
+              logoMode={subscription.logoMode}
+              size={52}
+            />
+            {primaryLinkedParent ? (
+              <View style={styles.parentLogoBadge}>
+                <ServiceLogo
+                  providerName={primaryLinkedParent.providerName}
+                  logoMode={primaryLinkedParent.logoMode}
+                  size={22}
+                />
+              </View>
+            ) : null}
+          </View>
           <View style={styles.identity}>
             <Text style={providerStyles}>{subscription.providerName}</Text>
             <Text style={sublineStyles}>{sublineText}</Text>
@@ -179,6 +193,22 @@ const createStyles = (theme: AppTheme) =>
       alignItems: "center",
       gap: spacing.md,
       flex: 1
+    },
+    logoWrap: {
+      width: 58,
+      height: 58,
+      justifyContent: "center",
+      alignItems: "center"
+    },
+    parentLogoBadge: {
+      position: "absolute",
+      right: -2,
+      bottom: -2,
+      padding: 2,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.borderStrong
     },
     identity: {
       flex: 1,

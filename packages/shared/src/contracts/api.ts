@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   billingFrequencySchema,
+  planTierSchema,
   subscriptionLogoModeSchema,
   subscriptionStatusSchema
 } from "../models/domain";
@@ -35,6 +36,8 @@ export const subscriptionInputSchema = z.object({
   notes: z.string().max(500).optional(),
   trialEndsAt: z.string().nullable().optional(),
   lastUsedAt: z.string().nullable().optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
+  accessEndsAt: z.string().nullable().optional(),
   status: subscriptionStatusSchema.optional()
 });
 
@@ -48,6 +51,7 @@ export const subscriptionQuerySchema = z.object({
 export const updateSettingsSchema = z.object({
   currency: z.string().length(3).optional(),
   language: z.string().min(1).optional(),
+  planTier: planTierSchema.optional(),
   colorBlindMode: z.boolean().optional(),
   notificationPreferences: z
     .object({

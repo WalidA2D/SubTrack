@@ -6,6 +6,7 @@ import {
 
 import { adminAuth, db } from "../config/firebaseAdmin";
 import { ApiError } from "../utils/apiError";
+import { syncPremiumPlanStatus } from "./premiumMembershipService";
 
 const usersCollection = db.collection("users");
 const categoriesCollection = db.collection("categories");
@@ -85,6 +86,7 @@ function isFirebaseUserNotFound(error: unknown) {
 
 export const userService = {
   async getProfile(userId: string) {
+    await syncPremiumPlanStatus(userId);
     const snapshot = await usersCollection.doc(userId).get();
 
     if (!snapshot.exists) {
@@ -121,6 +123,7 @@ export const userService = {
     const nextProfile = {
       ...(payload.currency ? { currency: payload.currency } : {}),
       ...(payload.language ? { language: payload.language } : {}),
+      ...(payload.planTier ? { planTier: payload.planTier } : {}),
       ...(payload.colorBlindMode !== undefined ? { colorBlindMode: payload.colorBlindMode } : {}),
       ...(nextPreferences ? { notificationPreferences: nextPreferences } : {}),
       updatedAt: new Date().toISOString()

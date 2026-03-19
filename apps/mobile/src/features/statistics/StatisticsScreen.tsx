@@ -1,18 +1,29 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  Alert,
   LayoutChangeEvent,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions
 } from "react-native";
+import { Subscription } from "@subly/shared";
 
+import { PromoCard } from "../../components/PromoCard";
 import { Screen } from "../../components/Screen";
+import { isPremiumPlan } from "../../constants/premium";
 import { useAppTranslation } from "../../i18n";
+import { useAppNavigation } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
-import { formatCurrency, formatMonthLabel } from "../../utils/format";
+import {
+  formatCurrency,
+  formatLongDate,
+  formatMonthLabel,
+  formatUsageCheckIn
+} from "../../utils/format";
 
 type CategorySlice = {
   categoryId: string;
@@ -34,24 +45,77 @@ type ChartPoint = {
   amount: number;
 };
 
+type StatisticsDrilldown = "active" | "lowUsage" | "topCategory" | null;
+type AverageMode = "monthly" | "yearly";
+type RankedCategory = CategorySlice & {
+  rank: number;
+  amountYearly: number;
+  subscriptionCount: number;
+};
+type LowUtilityReason = "unused" | "stale" | "duplicate_provider" | "duplicate_category";
+type LowUtilityItem = {
+  subscription: Subscription;
+  reasons: LowUtilityReason[];
+};
+
 export function StatisticsScreen(): JSX.Element {
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const navigation = useAppNavigation();
   const statistics = useWorkspaceStore((state) => state.statistics);
   const { t } = useAppTranslation();
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const profile = useWorkspaceStore((state) => state.profile);
+  const isPremium = isPremiumPlan(profile);
+  const [selectedDrilldown, setSelectedDrilldown] = useState<StatisticsDrilldown>(null);
+  const [averageMode, setAverageMode] = useState<AverageMode>("monthly");
   const currency = profile?.currency ?? "EUR";
+  const trackedSubscriptions = useMemo(
+    () =>
+      subscriptions.filter(
+        (subscription) => subscription.status === "active" || subscription.status === "trial"
+      ),
+    [subscriptions]
+  );
+  const activeSubscriptions = useMemo(
+    () =>
+      [...trackedSubscriptions]
+        .filter((subscription) => subscription.status === "active")
+        .sort((left, right) => right.priceMonthly - left.priceMonthly),
+    [trackedSubscriptions]
+  );
+  const lowUtilityItems = useMemo(
+    () => getLowUtilitySubscriptions(trackedSubscriptions),
+    [trackedSubscriptions]
+  );
   const categorySource = [...(statistics?.byCategory ?? [])].sort(
     (left, right) => right.amountMonthly - left.amountMonthly
   );
   const categoryTotal = categorySource.reduce((sum, item) => sum + item.amountMonthly, 0);
-  const categoryData: CategorySlice[] = categorySource.slice(0, 6).map((item, index) => ({
+  const categorySubscriptionCounts = useMemo(
+    () =>
+      trackedSubscriptions.reduce<Record<string, number>>((accumulator, subscription) => {
+        accumulator[subscription.categoryId] = (accumulator[subscription.categoryId] ?? 0) + 1;
+        return accumulator;
+      }, {}),
+    [trackedSubscriptions]
+  );
+  const categoryRanking: RankedCategory[] = categorySource.map((item, index) => ({
     ...item,
+    rank: index + 1,
+    amountYearly: Number((item.amountMonthly * 12).toFixed(2)),
+    subscriptionCount: categorySubscriptionCounts[item.categoryId] ?? 0,
     percentage: categoryTotal > 0 ? item.amountMonthly / categoryTotal : 0,
     color: theme.chartColors[index % theme.chartColors.length]
+  }));
+  const categoryData: CategorySlice[] = categoryRanking.slice(0, 6).map((item) => ({
+    categoryId: item.categoryId,
+    categoryName: item.categoryName,
+    amountMonthly: item.amountMonthly,
+    percentage: item.percentage,
+    color: item.color
   }));
   const monthlyTrend = [...(statistics?.monthlyTrend ?? [])]
     .sort((left, right) => left.month.localeCompare(right.month))
@@ -60,106 +124,350 @@ export function StatisticsScreen(): JSX.Element {
     monthlyTrend.length > 0
       ? monthlyTrend.reduce((sum, item) => sum + item.amount, 0) / monthlyTrend.length
       : 0;
-  const lowUtilityCount = getLowUtilitySubscriptionCount(subscriptions);
+  const lowUtilityCount = lowUtilityItems.length;
   const biggestSubscription = statistics?.biggestSubscriptions[0];
-  const topCategory = categoryData[0];
+  const topCategory = categoryRanking[0];
+  const trialCount = trackedSubscriptions.filter(
+    (subscription) => subscription.status === "trial"
+  ).length;
+  const averageLabel =
+    averageMode === "monthly" ? t("statistics.averagePerMonth") : "Moyenne / an";
+  const averageValue =
+    averageMode === "monthly" ? monthlyAverage : monthlyAverage * 12;
+
+  const toggleDrilldown = (nextDrilldown: Exclude<StatisticsDrilldown, null>) => {
+    setSelectedDrilldown((current) => (current === nextDrilldown ? null : nextDrilldown));
+  };
+
+  const handleOpenPremium = (feature: string) => {
+    Alert.alert("Disponible avec Premium", `${feature} fait partie des avantages Premium.`, [
+      {
+        text: "Plus tard",
+        style: "cancel"
+      },
+      {
+        text: "Voir Premium",
+        onPress: () => navigation.navigate("Profile")
+      }
+    ]);
+  };
+
+  const statisticsHeaderAction = (
+    <Pressable
+      style={styles.headerIconButton}
+      onPress={() =>
+        isPremium
+          ? navigation.navigate("StatisticsCalendar")
+          : handleOpenPremium("Le calendrier des prelevements")
+      }
+    >
+      <CalendarGlyph />
+    </Pressable>
+  );
 
   return (
     <Screen
       title={t("statistics.title")}
       subtitle={t("statistics.subtitle")}
+      action={statisticsHeaderAction}
     >
       <View style={styles.summaryGrid}>
         <SummaryCard
           compactWidth={isCompact}
           label={t("statistics.active")}
-          value={String(statistics?.subscriptionCount ?? 0)}
+          value={String(activeSubscriptions.length)}
           tone="orange"
+          onPress={() => toggleDrilldown("active")}
+          selected={selectedDrilldown === "active"}
+          helper="Touchez pour voir la liste"
         />
         <SummaryCard
           compactWidth={isCompact}
           label={t("statistics.lowUsage")}
-          value={String(lowUtilityCount)}
+          value={isPremium ? String(lowUtilityCount) : "Premium"}
           tone="purple"
+          onPress={() =>
+            isPremium
+              ? toggleDrilldown("lowUsage")
+              : handleOpenPremium("La detection des abonnements peu utiles et des doublons")
+          }
+          selected={isPremium && selectedDrilldown === "lowUsage"}
+          helper={isPremium ? "Touchez pour ouvrir le detail" : "Reserve au Premium"}
         />
         <SummaryCard
           compactWidth={isCompact}
-          label={t("statistics.averagePerMonth")}
-          value={formatCurrency(monthlyAverage, currency)}
+          label={averageLabel}
+          value={formatCurrency(averageValue, currency)}
           tone="green"
+          onPress={() =>
+            setAverageMode((current) => (current === "monthly" ? "yearly" : "monthly"))
+          }
+          helper={
+            averageMode === "monthly"
+              ? "Touchez pour passer en annuel"
+              : "Touchez pour revenir au mensuel"
+          }
         />
         <SummaryCard
           compactWidth={isCompact}
           label={t("statistics.topCategory")}
-          value={topCategory?.categoryName ?? t("statistics.none")}
+          value={isPremium ? topCategory?.categoryName ?? t("statistics.none") : "Premium"}
           tone="red"
           compact
+          onPress={() =>
+            isPremium
+              ? toggleDrilldown("topCategory")
+              : handleOpenPremium("Le classement avance des categories")
+          }
+          selected={isPremium && selectedDrilldown === "topCategory"}
+          helper={isPremium ? "Touchez pour voir le podium" : "Reserve au Premium"}
         />
       </View>
 
-      <View style={styles.card}>
-        <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
-          <View>
-            <Text style={styles.sectionEyebrow}>{t("statistics.pie")}</Text>
-            <Text style={styles.cardTitle}>{t("statistics.spendByCategory")}</Text>
+      {selectedDrilldown && (selectedDrilldown === "active" || isPremium) ? (
+        <View style={styles.card}>
+          <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
+            <View style={styles.drilldownHeaderText}>
+              <Text style={styles.sectionEyebrow}>
+                {selectedDrilldown === "active"
+                  ? "Liste active"
+                  : selectedDrilldown === "lowUsage"
+                    ? "A surveiller"
+                    : "Classement"}
+              </Text>
+              <Text style={styles.cardTitle}>
+                {selectedDrilldown === "active"
+                  ? "Abonnements actifs"
+                  : selectedDrilldown === "lowUsage"
+                    ? "Abonnements peu utiles"
+                    : "Top categories"}
+              </Text>
+              <Text style={styles.drilldownDescription}>
+                {selectedDrilldown === "active"
+                  ? "Retrouve ici tous les abonnements actifs et ouvre une fiche en un tap."
+                  : selectedDrilldown === "lowUsage"
+                    ? "Subly regroupe ici les services peu utilises, redondants ou a verifier."
+                    : "Les categories sont classees par poids dans tes depenses avec un podium pour les trois premieres."}
+              </Text>
+            </View>
+            <View style={styles.drilldownActions}>
+              <MetricPill
+                label={
+                  selectedDrilldown === "topCategory" ? "Categories" : "Abonnements"
+                }
+                value={String(
+                  selectedDrilldown === "active"
+                    ? activeSubscriptions.length
+                    : selectedDrilldown === "lowUsage"
+                      ? lowUtilityItems.length
+                      : categoryRanking.length
+                )}
+              />
+              <Pressable onPress={() => setSelectedDrilldown(null)}>
+                <Text style={styles.drilldownDismiss}>Fermer</Text>
+              </Pressable>
+            </View>
           </View>
-          <MetricPill label={t("statistics.monthly")} value={formatCurrency(categoryTotal, currency)} />
-        </View>
-        <CategoryDonutChart compact={isCompact} data={categoryData} currency={currency} />
-      </View>
 
-      <View style={styles.card}>
-        <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
-          <View>
-            <Text style={styles.sectionEyebrow}>{t("statistics.bars")}</Text>
-            <Text style={styles.cardTitle}>{t("statistics.compareByCategory")}</Text>
-          </View>
-          <MetricPill label={t("statistics.leader")} value={topCategory?.categoryName ?? t("statistics.none")} />
-        </View>
-        <CategoryBarChart compact={isCompact} data={categoryData} currency={currency} />
-      </View>
+          {selectedDrilldown === "active" ? (
+            activeSubscriptions.length > 0 ? (
+              <View style={styles.drilldownList}>
+                {activeSubscriptions.map((subscription) => (
+                  <SubscriptionDrilldownRow
+                    key={subscription.id}
+                    subscription={subscription}
+                    currency={currency}
+                    subtitle={`${subscription.categoryName} · prochaine echeance le ${formatLongDate(
+                      subscription.nextBillingDate
+                    )}`}
+                    chips={[formatUsageCheckIn(subscription.usageCheckIn)]}
+                    onPress={() =>
+                      navigation.navigate("SubscriptionDetails", {
+                        subscriptionId: subscription.id
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState message="Aucun abonnement actif a afficher pour le moment." />
+            )
+          ) : null}
 
-      <View style={styles.card}>
-        <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
-          <View>
-            <Text style={styles.sectionEyebrow}>{t("statistics.curve")}</Text>
-            <Text style={styles.cardTitle}>{t("statistics.evolutionByMonth")}</Text>
+          {selectedDrilldown === "lowUsage" ? (
+            lowUtilityItems.length > 0 ? (
+              <View style={styles.drilldownList}>
+                {lowUtilityItems.map((item) => (
+                  <SubscriptionDrilldownRow
+                    key={item.subscription.id}
+                    subscription={item.subscription}
+                    currency={currency}
+                    subtitle={`${item.subscription.categoryName} · ${buildLowUtilitySubtitle(
+                      item.subscription
+                    )}`}
+                    chips={item.reasons.map((reason) =>
+                      describeLowUtilityReason(reason, item.subscription.lastUsedAt ?? null)
+                    )}
+                    onPress={() =>
+                      navigation.navigate("SubscriptionDetails", {
+                        subscriptionId: item.subscription.id
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState message="Aucun abonnement peu utile detecte sur la selection actuelle." />
+            )
+          ) : null}
+
+          {selectedDrilldown === "topCategory" ? (
+            categoryRanking.length > 0 ? (
+              <View style={styles.drilldownList}>
+                <CategoryPodium
+                  compact={isCompact}
+                  categories={categoryRanking.slice(0, 3)}
+                  currency={currency}
+                />
+                <View style={styles.categoryRankingList}>
+                  {categoryRanking.map((category) => (
+                    <View key={category.categoryId} style={styles.categoryRankingRow}>
+                      <View style={styles.categoryRankBadge}>
+                        <Text style={styles.categoryRankBadgeLabel}>#{category.rank}</Text>
+                      </View>
+                      <View style={styles.categoryRankingText}>
+                        <Text style={styles.categoryRankingTitle}>{category.categoryName}</Text>
+                        <Text style={styles.categoryRankingMeta}>
+                          {category.subscriptionCount} abonnement(s) · {Math.round(category.percentage * 100)}%
+                        </Text>
+                      </View>
+                      <View style={styles.categoryRankingAmounts}>
+                        <Text style={styles.categoryRankingAmount}>
+                          {formatCurrency(category.amountMonthly, currency)}
+                        </Text>
+                        <Text style={styles.categoryRankingAmountMeta}>/ mois</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <EmptyState message="Ajoute quelques abonnements pour construire le classement des categories." />
+            )
+          ) : null}
+        </View>
+      ) : null}
+
+      {isPremium ? (
+        <>
+          <View style={styles.card}>
+            <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionEyebrow}>{t("statistics.pie")}</Text>
+                <Text style={styles.cardTitle}>{t("statistics.spendByCategory")}</Text>
+              </View>
+              <MetricPill label={t("statistics.monthly")} value={formatCurrency(categoryTotal, currency)} />
+            </View>
+            <CategoryDonutChart compact={isCompact} data={categoryData} currency={currency} />
           </View>
-          <MetricPill
-            label={t("statistics.lastMonth")}
-            value={formatCurrency(monthlyTrend.at(-1)?.amount ?? 0, currency)}
+
+          <View style={styles.card}>
+            <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionEyebrow}>{t("statistics.bars")}</Text>
+                <Text style={styles.cardTitle}>{t("statistics.compareByCategory")}</Text>
+              </View>
+              <MetricPill label={t("statistics.leader")} value={topCategory?.categoryName ?? t("statistics.none")} />
+            </View>
+            <CategoryBarChart compact={isCompact} data={categoryData} currency={currency} />
+          </View>
+
+          <View style={styles.card}>
+            <View style={[styles.sectionHeader, isCompact ? styles.sectionHeaderCompact : null]}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionEyebrow}>{t("statistics.curve")}</Text>
+                <Text style={styles.cardTitle}>{t("statistics.evolutionByMonth")}</Text>
+              </View>
+              <MetricPill
+                label={t("statistics.lastMonth")}
+                value={formatCurrency(monthlyTrend.at(-1)?.amount ?? 0, currency)}
+              />
+            </View>
+            <MonthlyTrendChart compact={isCompact} data={monthlyTrend} currency={currency} />
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t("statistics.highlight")}</Text>
+            <InsightRow
+              label={t("statistics.biggestSubscription")}
+              value={
+                biggestSubscription
+                  ? `${biggestSubscription.providerName} - ${formatCurrency(
+                      biggestSubscription.amountMonthly,
+                      currency
+                    )} / mois`
+                  : t("statistics.noActiveSubscription")
+              }
+            />
+            <InsightRow
+              label={t("statistics.dominant")}
+              value={
+                topCategory
+                  ? `${topCategory.categoryName} - ${Math.round(topCategory.percentage * 100)}%`
+                  : t("statistics.noCategory")
+              }
+            />
+            <InsightRow
+              label={t("statistics.underWatch")}
+              value={t("statistics.lightlyUsed", { count: lowUtilityCount })}
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Vue simple</Text>
+            <InsightRow
+              label="Total mensuel"
+              value={formatCurrency(categoryTotal, currency)}
+            />
+            <InsightRow
+              label="Categories suivies"
+              value={String(categoryRanking.length)}
+            />
+            <InsightRow
+              label="Essais en cours"
+              value={String(trialCount)}
+            />
+          </View>
+          <PromoCard
+            eyebrow="Premium"
+            title="Statistiques avancees"
+            body="Passe au Premium pour debloquer les graphiques, le podium des categories, le calendrier des prelevements et la detection des doublons."
+            ctaLabel="Voir le Premium"
+            onPress={() => navigation.navigate("Profile")}
+            tone="purple"
           />
-        </View>
-        <MonthlyTrendChart compact={isCompact} data={monthlyTrend} currency={currency} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t("statistics.highlight")}</Text>
-        <InsightRow
-          label={t("statistics.biggestSubscription")}
-          value={
-            biggestSubscription
-              ? `${biggestSubscription.providerName} - ${formatCurrency(
-                  biggestSubscription.amountMonthly,
-                  currency
-                )} / mois`
-              : t("statistics.noActiveSubscription")
-          }
-        />
-        <InsightRow
-          label={t("statistics.dominant")}
-          value={
-            topCategory
-              ? `${topCategory.categoryName} - ${Math.round(topCategory.percentage * 100)}%`
-              : t("statistics.noCategory")
-          }
-        />
-        <InsightRow
-          label={t("statistics.underWatch")}
-          value={t("statistics.lightlyUsed", { count: lowUtilityCount })}
-        />
-      </View>
+        </>
+      )}
     </Screen>
+  );
+}
+
+function CalendarGlyph(): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
+  return (
+    <View style={styles.calendarGlyph}>
+      <View style={styles.calendarGlyphTopBar} />
+      <View style={styles.calendarGlyphRingLeft} />
+      <View style={styles.calendarGlyphRingRight} />
+      <View style={styles.calendarGlyphGrid}>
+        {Array.from({ length: 4 }, (_, index) => (
+          <View key={index} style={styles.calendarGlyphDot} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -168,15 +476,54 @@ function SummaryCard({
   value,
   tone,
   compact = false,
-  compactWidth = false
+  compactWidth = false,
+  selected = false,
+  helper,
+  onPress
 }: {
   label: string;
   value: string;
   tone: "orange" | "purple" | "green" | "red";
   compact?: boolean;
   compactWidth?: boolean;
+  selected?: boolean;
+  helper?: string;
+  onPress?: () => void;
 }): JSX.Element {
   const styles = createStyles(useAppTheme());
+
+  const content = (
+    <>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text
+        numberOfLines={compact ? 2 : 1}
+        style={[
+          styles.summaryValue,
+          compact ? styles.summaryValueCompact : null
+        ]}
+      >
+        {value}
+      </Text>
+      {helper ? <Text style={styles.summaryHelper}>{helper}</Text> : null}
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={[
+          styles.summaryCard,
+          styles[`${tone}Card`],
+          compactWidth ? styles.summaryCardCompactWidth : null,
+          styles.summaryCardInteractive,
+          selected ? styles.summaryCardSelected : null
+        ]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
 
   return (
     <View
@@ -186,13 +533,7 @@ function SummaryCard({
         compactWidth ? styles.summaryCardCompactWidth : null
       ]}
     >
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text
-        numberOfLines={compact ? 2 : 1}
-        style={[styles.summaryValue, compact ? styles.summaryValueCompact : null]}
-      >
-        {value}
-      </Text>
+      {content}
     </View>
   );
 }
@@ -206,6 +547,92 @@ function MetricPill({ label, value }: { label: string; value: string }): JSX.Ele
       <Text numberOfLines={1} style={styles.metricValue}>
         {value}
       </Text>
+    </View>
+  );
+}
+
+function SubscriptionDrilldownRow({
+  subscription,
+  currency,
+  subtitle,
+  chips,
+  onPress
+}: {
+  subscription: Subscription;
+  currency: string;
+  subtitle: string;
+  chips?: string[];
+  onPress: () => void;
+}): JSX.Element {
+  const styles = createStyles(useAppTheme());
+
+  return (
+    <Pressable style={styles.subscriptionDrilldownRow} onPress={onPress}>
+      <View style={styles.subscriptionDrilldownHeader}>
+        <View style={styles.subscriptionDrilldownText}>
+          <Text style={styles.subscriptionDrilldownTitle}>{subscription.providerName}</Text>
+          <Text style={styles.subscriptionDrilldownSubtitle}>{subtitle}</Text>
+        </View>
+        <View style={styles.subscriptionDrilldownAmountWrap}>
+          <Text style={styles.subscriptionDrilldownAmount}>
+            {formatCurrency(subscription.priceMonthly, currency)}
+          </Text>
+          <Text style={styles.subscriptionDrilldownAmountMeta}>/ mois</Text>
+        </View>
+      </View>
+      {chips?.length ? (
+        <View style={styles.subscriptionDrilldownChipWrap}>
+          {chips.map((chip) => (
+            <View key={`${subscription.id}-${chip}`} style={styles.subscriptionDrilldownChip}>
+              <Text style={styles.subscriptionDrilldownChipLabel}>{chip}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function CategoryPodium({
+  categories,
+  compact,
+  currency
+}: {
+  categories: RankedCategory[];
+  compact: boolean;
+  currency: string;
+}): JSX.Element {
+  const styles = createStyles(useAppTheme());
+  const podiumOrder = [categories[1], categories[0], categories[2]].filter(Boolean) as RankedCategory[];
+
+  return (
+    <View style={[styles.podiumRow, compact ? styles.podiumRowCompact : null]}>
+      {podiumOrder.map((category) => (
+        <View
+          key={category.categoryId}
+          style={[
+            styles.podiumStep,
+            category.rank === 1
+              ? styles.podiumStepFirst
+              : category.rank === 2
+                ? styles.podiumStepSecond
+                : styles.podiumStepThird,
+            compact ? styles.podiumStepCompact : null
+          ]}
+        >
+          <View style={styles.podiumBadge}>
+            <Text style={styles.podiumBadgeLabel}>#{category.rank}</Text>
+          </View>
+          <Text numberOfLines={1} style={styles.podiumTitle}>
+            {category.categoryName}
+          </Text>
+          <Text style={styles.podiumMeta}>{category.subscriptionCount} abonnement(s)</Text>
+          <Text style={styles.podiumAmount}>
+            {formatCurrency(category.amountMonthly, currency)}
+          </Text>
+          <Text style={styles.podiumAmountMeta}>/ mois</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -495,15 +922,34 @@ function shrinkLabel(value: string) {
   return firstWord.length > 8 ? `${firstWord.slice(0, 7)}.` : firstWord;
 }
 
-function getLowUtilitySubscriptionCount(subscriptions: Array<{
-  id: string;
-  categoryName: string;
-  normalizedProviderName: string;
-  usageCheckIn: string;
-  lastUsedAt?: string | null;
-  priceMonthly: number;
-}>) {
-  const lowUtilityIds = new Set<string>();
+function buildLowUtilitySubtitle(subscription: Subscription) {
+  if (subscription.lastUsedAt) {
+    return `derniere activite le ${formatLongDate(subscription.lastUsedAt)}`;
+  }
+
+  return formatUsageCheckIn(subscription.usageCheckIn);
+}
+
+function describeLowUtilityReason(reason: LowUtilityReason, lastUsedAt: string | null) {
+  if (reason === "unused") {
+    return "Usage signale comme faible";
+  }
+
+  if (reason === "stale") {
+    return lastUsedAt
+      ? `Inactif depuis le ${formatLongDate(lastUsedAt)}`
+      : "Pas d'activite recente";
+  }
+
+  if (reason === "duplicate_provider") {
+    return "Doublon de service possible";
+  }
+
+  return "Categorie deja surchargee";
+}
+
+function getLowUtilitySubscriptions(subscriptions: Subscription[]): LowUtilityItem[] {
+  const lowUtilityReasons = new Map<string, Set<LowUtilityReason>>();
   const staleUsageCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
   subscriptions.forEach((subscription) => {
@@ -515,14 +961,21 @@ function getLowUtilitySubscriptionCount(subscriptions: Array<{
       subscription.usageCheckIn === "unused" ||
       (lastUsedTime !== null && lastUsedTime < staleUsageCutoff)
     ) {
-      lowUtilityIds.add(subscription.id);
+      if (subscription.usageCheckIn === "unused") {
+        addLowUtilityReason(lowUtilityReasons, subscription.id, "unused");
+      }
+
+      if (lastUsedTime !== null && lastUsedTime < staleUsageCutoff) {
+        addLowUtilityReason(lowUtilityReasons, subscription.id, "stale");
+      }
     }
   });
 
   markExtraSubscriptionsAsLowUtility(
     subscriptions,
     (subscription) => subscription.normalizedProviderName,
-    lowUtilityIds
+    "duplicate_provider",
+    lowUtilityReasons
   );
 
   markExtraSubscriptionsAsLowUtility(
@@ -530,10 +983,33 @@ function getLowUtilitySubscriptionCount(subscriptions: Array<{
       LOW_UTILITY_CATEGORY_KEYS.has(normalizeCategoryName(subscription.categoryName))
     ),
     (subscription) => normalizeCategoryName(subscription.categoryName),
-    lowUtilityIds
+    "duplicate_category",
+    lowUtilityReasons
   );
 
-  return lowUtilityIds.size;
+  return subscriptions
+    .filter((subscription) => lowUtilityReasons.has(subscription.id))
+    .map((subscription) => ({
+      subscription,
+      reasons: Array.from(lowUtilityReasons.get(subscription.id) ?? [])
+    }))
+    .sort((left, right) => {
+      if (right.reasons.length !== left.reasons.length) {
+        return right.reasons.length - left.reasons.length;
+      }
+
+      return right.subscription.priceMonthly - left.subscription.priceMonthly;
+    });
+}
+
+function addLowUtilityReason(
+  lowUtilityReasons: Map<string, Set<LowUtilityReason>>,
+  subscriptionId: string,
+  reason: LowUtilityReason
+) {
+  const currentReasons = lowUtilityReasons.get(subscriptionId) ?? new Set<LowUtilityReason>();
+  currentReasons.add(reason);
+  lowUtilityReasons.set(subscriptionId, currentReasons);
 }
 
 function markExtraSubscriptionsAsLowUtility<T extends {
@@ -543,7 +1019,8 @@ function markExtraSubscriptionsAsLowUtility<T extends {
 }>(
   subscriptions: T[],
   getGroupKey: (subscription: T) => string,
-  lowUtilityIds: Set<string>
+  reason: LowUtilityReason,
+  lowUtilityReasons: Map<string, Set<LowUtilityReason>>
 ) {
   const groups = subscriptions.reduce<Record<string, T[]>>((accumulator, subscription) => {
     const key = getGroupKey(subscription);
@@ -565,7 +1042,7 @@ function markExtraSubscriptionsAsLowUtility<T extends {
     });
 
     sortedGroup.slice(1).forEach((subscription) => {
-      lowUtilityIds.add(subscription.id);
+      addLowUtilityReason(lowUtilityReasons, subscription.id, reason);
     });
   });
 }
@@ -597,6 +1074,12 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   summaryCardCompactWidth: {
     width: "100%"
+  },
+  summaryCardInteractive: {
+    overflow: "hidden"
+  },
+  summaryCardSelected: {
+    borderColor: theme.colors.white
   },
   orangeCard: {
     backgroundColor: "rgba(255, 184, 77, 0.12)",
@@ -630,6 +1113,12 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 19,
     lineHeight: 24
   },
+  summaryHelper: {
+    marginTop: "auto",
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.colors.textSecondary
+  },
   card: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
@@ -643,11 +1132,17 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: spacing.md
+    gap: spacing.md,
+    flexWrap: "wrap"
   },
   sectionHeaderCompact: {
     flexDirection: "column",
     alignItems: "stretch"
+  },
+  sectionHeaderText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
   },
   sectionEyebrow: {
     fontSize: 11,
@@ -661,7 +1156,29 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontWeight: "800",
     color: theme.colors.textPrimary
   },
+  drilldownHeaderText: {
+    flex: 1,
+    gap: 6
+  },
+  drilldownDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.colors.textSecondary
+  },
+  drilldownActions: {
+    alignItems: "flex-end",
+    gap: spacing.sm
+  },
+  drilldownDismiss: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.primary
+  },
+  drilldownList: {
+    gap: spacing.md
+  },
   metricPill: {
+    alignSelf: "flex-start",
     minWidth: 110,
     maxWidth: 180,
     borderRadius: 18,
@@ -683,6 +1200,197 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: theme.colors.textPrimary
+  },
+  subscriptionDrilldownRow: {
+    gap: spacing.sm,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: theme.colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  subscriptionDrilldownHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
+  subscriptionDrilldownText: {
+    flex: 1,
+    gap: 4
+  },
+  subscriptionDrilldownTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
+  },
+  subscriptionDrilldownSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.colors.textSecondary
+  },
+  subscriptionDrilldownAmountWrap: {
+    alignItems: "flex-end",
+    gap: 2
+  },
+  subscriptionDrilldownAmount: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
+  subscriptionDrilldownAmountMeta: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    color: theme.colors.textTertiary
+  },
+  subscriptionDrilldownChipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  subscriptionDrilldownChip: {
+    minHeight: 32,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  subscriptionDrilldownChipLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
+  },
+  podiumRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
+  podiumRowCompact: {
+    gap: spacing.sm
+  },
+  podiumStep: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: theme.colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  podiumStepCompact: {
+    paddingHorizontal: spacing.xs,
+    minWidth: 0
+  },
+  podiumStepFirst: {
+    minHeight: 180,
+    borderColor: theme.colors.primary
+  },
+  podiumStepSecond: {
+    minHeight: 148
+  },
+  podiumStepThird: {
+    minHeight: 132
+  },
+  podiumBadge: {
+    minWidth: 44,
+    minHeight: 28,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  podiumBadgeLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
+  podiumTitle: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
+  podiumMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: theme.colors.textSecondary
+  },
+  podiumAmount: {
+    marginTop: spacing.sm,
+    fontSize: 16,
+    fontWeight: "800",
+    color: theme.colors.primary
+  },
+  podiumAmountMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    textTransform: "uppercase",
+    color: theme.colors.textTertiary
+  },
+  categoryRankingList: {
+    gap: spacing.sm
+  },
+  categoryRankingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: theme.colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  categoryRankBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  categoryRankBadgeLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
+  categoryRankingText: {
+    flex: 1,
+    gap: 4
+  },
+  categoryRankingTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
+  },
+  categoryRankingMeta: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.colors.textSecondary
+  },
+  categoryRankingAmounts: {
+    alignItems: "flex-end",
+    gap: 2
+  },
+  categoryRankingAmount: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
+  categoryRankingAmountMeta: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    color: theme.colors.textTertiary
   },
   donutLayout: {
     gap: spacing.lg
@@ -923,5 +1631,68 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
     color: theme.colors.textSecondary
+  },
+  headerIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    ...shadows.card
+  },
+  calendarGlyph: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: theme.colors.textPrimary,
+    position: "relative",
+    overflow: "hidden"
+  },
+  calendarGlyphTopBar: {
+    position: "absolute",
+    top: 4,
+    left: 0,
+    right: 0,
+    height: 5,
+    backgroundColor: theme.colors.textPrimary
+  },
+  calendarGlyphRingLeft: {
+    position: "absolute",
+    top: 0,
+    left: 4,
+    width: 3,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: theme.colors.textPrimary
+  },
+  calendarGlyphRingRight: {
+    position: "absolute",
+    top: 0,
+    right: 4,
+    width: 3,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: theme.colors.textPrimary
+  },
+  calendarGlyphGrid: {
+    position: "absolute",
+    left: 4,
+    right: 4,
+    bottom: 4,
+    top: 11,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignContent: "space-between"
+  },
+  calendarGlyphDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primary
   }
 });

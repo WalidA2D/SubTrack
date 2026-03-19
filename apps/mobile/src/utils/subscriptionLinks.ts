@@ -4,12 +4,18 @@ import {
   Subscription
 } from "@subly/shared";
 
+export type LinkedParentSubscriptionSummary = Pick<
+  Subscription,
+  "id" | "providerName" | "logoMode"
+>;
+
 export type SubscriptionDisplayEntry = {
   id: string;
   subscription: Subscription;
   isIncludedLink: boolean;
   linkedParentProviderNames?: string[];
   linkedParentSubscriptionIds?: string[];
+  linkedParentSubscriptions?: LinkedParentSubscriptionSummary[];
 };
 
 function getAssociationKey(providerName: string): string {
@@ -24,6 +30,17 @@ function appendUnique(values: string[] | undefined, nextValue: string): string[]
 
   const current = values ?? [];
   return current.includes(nextValue) ? current : [...current, nextValue];
+}
+
+function appendUniqueParentSubscription(
+  values: LinkedParentSubscriptionSummary[] | undefined,
+  nextValue: LinkedParentSubscriptionSummary
+): LinkedParentSubscriptionSummary[] {
+  const current = values ?? [];
+
+  return current.some((value) => value.id === nextValue.id)
+    ? current
+    : [...current, nextValue];
 }
 
 export function buildSubscriptionDisplayEntries(
@@ -81,6 +98,14 @@ export function buildSubscriptionDisplayEntries(
             existingEntry.linkedParentSubscriptionIds,
             parentSubscription.id
           );
+          existingEntry.linkedParentSubscriptions = appendUniqueParentSubscription(
+            existingEntry.linkedParentSubscriptions,
+            {
+              id: parentSubscription.id,
+              providerName: parentSubscription.providerName,
+              logoMode: parentSubscription.logoMode
+            }
+          );
         });
         return;
       }
@@ -99,6 +124,13 @@ export function buildSubscriptionDisplayEntries(
         isIncludedLink: true,
         linkedParentProviderNames: [parentSubscription.providerName],
         linkedParentSubscriptionIds: [parentSubscription.id],
+        linkedParentSubscriptions: [
+          {
+            id: parentSubscription.id,
+            providerName: parentSubscription.providerName,
+            logoMode: parentSubscription.logoMode
+          }
+        ],
         subscription: {
           id: virtualEntryId,
           userId: parentSubscription.userId,

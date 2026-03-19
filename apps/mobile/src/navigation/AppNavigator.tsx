@@ -13,9 +13,11 @@ import { AuthScreen } from "../features/auth/AuthScreen";
 import { OnboardingScreen } from "../features/auth/OnboardingScreen";
 import { BubbleGalleryScreen } from "../features/dashboard/BubbleGalleryScreen";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen";
+import { AppExperienceOverlay } from "../features/experience/AppExperienceOverlay";
 import { ProfileScreen } from "../features/profile/ProfileScreen";
 import { LegalDocumentScreen } from "../features/settings/LegalDocumentScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
+import { StatisticsCalendarScreen } from "../features/statistics/StatisticsCalendarScreen";
 import { StatisticsScreen } from "../features/statistics/StatisticsScreen";
 import { AddSubscriptionScreen } from "../features/subscriptions/AddSubscriptionScreen";
 import { SubscriptionDetailsScreen } from "../features/subscriptions/SubscriptionDetailsScreen";
@@ -140,11 +142,11 @@ export function AppNavigator(): JSX.Element {
   if (!isAuthResolved || !isStoreHydrated) {
     return (
       <EdgeBackGestureShell>
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingTitle}>{t("nav.openingSpace")}</Text>
-        <Text style={styles.loadingBody}>{t("nav.checkingSession")}</Text>
-      </View>
+        <View style={styles.loadingScreen}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingTitle}>{t("nav.openingSpace")}</Text>
+          <Text style={styles.loadingBody}>{t("nav.checkingSession")}</Text>
+        </View>
       </EdgeBackGestureShell>
     );
   }
@@ -160,6 +162,8 @@ export function AppNavigator(): JSX.Element {
       content = <SubscriptionListScreen />;
     } else if (overlayRoute?.name === "SubscriptionDetails") {
       content = <SubscriptionDetailsScreen />;
+    } else if (overlayRoute?.name === "StatisticsCalendar") {
+      content = <StatisticsCalendarScreen />;
     } else if (overlayRoute?.name === "Profile") {
       content = <ProfileScreen />;
     } else if (overlayRoute?.name === "Settings") {
@@ -170,7 +174,14 @@ export function AppNavigator(): JSX.Element {
       content = <MainTabs />;
     }
 
-    return <EdgeBackGestureShell>{content}</EdgeBackGestureShell>;
+    return (
+      <EdgeBackGestureShell>
+        <View style={edgeGestureStyles.shell}>
+          {content}
+          <AppExperienceOverlay />
+        </View>
+      </EdgeBackGestureShell>
+    );
   }
 
   if (!hasCompletedOnboarding) {
@@ -270,7 +281,7 @@ const createStyles = (theme: AppTheme) =>
       alignItems: "center",
       justifyContent: "space-between",
       width: "100%",
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
       borderRadius: 28,
       borderWidth: 1,
@@ -278,7 +289,7 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceRaised
     },
     tabBarCompact: {
-      paddingHorizontal: spacing.sm
+      paddingHorizontal: spacing.xs
     },
     tabBarTablet: {
       maxWidth: 560
@@ -291,7 +302,7 @@ const createStyles = (theme: AppTheme) =>
       minHeight: 50
     },
     tabLabel: {
-      fontSize: 13,
+      fontSize: 12,
       color: theme.colors.textTertiary,
       fontWeight: "600"
     },

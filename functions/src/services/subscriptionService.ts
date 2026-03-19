@@ -18,6 +18,7 @@ import { addBillingCycle } from "../utils/date";
 import { ApiError } from "../utils/apiError";
 import { normalizeProviderName } from "../utils/normalize";
 import { buildInsights } from "./insightService";
+import { syncPremiumPlanStatus } from "./premiumMembershipService";
 
 const subscriptionsCollection = db.collection("subscriptions");
 const usersCollection = db.collection("users");
@@ -71,6 +72,7 @@ async function getOwnedSubscriptions(userId: string): Promise<Subscription[]> {
 }
 
 async function ensureCanCreateSubscription(userId: string) {
+  await syncPremiumPlanStatus(userId);
   const userSnapshot = await usersCollection.doc(userId).get();
 
   if (!userSnapshot.exists) {
@@ -93,6 +95,7 @@ async function ensureCanCreateSubscription(userId: string) {
 }
 
 async function ensureIncludedProviderLimit(userId: string, includedProviderCount: number) {
+  await syncPremiumPlanStatus(userId);
   const userSnapshot = await usersCollection.doc(userId).get();
 
   if (!userSnapshot.exists) {
@@ -150,6 +153,8 @@ function buildSubscriptionRecord(
     notes: payload.notes ?? existing?.notes ?? "",
     trialEndsAt: payload.trialEndsAt ?? existing?.trialEndsAt ?? null,
     lastUsedAt: payload.lastUsedAt ?? existing?.lastUsedAt ?? null,
+    cancelAtPeriodEnd: payload.cancelAtPeriodEnd ?? existing?.cancelAtPeriodEnd ?? false,
+    accessEndsAt: payload.accessEndsAt ?? existing?.accessEndsAt ?? null,
     usageCheckIn: existing?.usageCheckIn ?? "active",
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -214,6 +219,7 @@ export const subscriptionService = {
   },
 
   async listSubscriptions(userId: string, query: SubscriptionQuery): Promise<Subscription[]> {
+    await syncPremiumPlanStatus(userId);
     let subscriptions = await getOwnedSubscriptions(userId);
 
     subscriptions = subscriptions.filter((subscription) => !subscription.archivedAt);
@@ -328,6 +334,7 @@ export const subscriptionService = {
   },
 
   async getDashboardSummary(userId: string) {
+    await syncPremiumPlanStatus(userId);
     const subscriptions = (await getOwnedSubscriptions(userId)).filter(
       (subscription) =>
         !subscription.archivedAt &&
@@ -365,6 +372,7 @@ export const subscriptionService = {
   },
 
   async getStatisticsOverview(userId: string) {
+    await syncPremiumPlanStatus(userId);
     const subscriptions = (await getOwnedSubscriptions(userId)).filter(
       (subscription) =>
         !subscription.archivedAt &&

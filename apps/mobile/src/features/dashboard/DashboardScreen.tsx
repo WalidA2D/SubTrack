@@ -15,11 +15,13 @@ import {
 
 import { BrandLogo } from "../../components/BrandLogo";
 import { MickeyBubble } from "../../components/MickeyBubble";
+import { PromoCard } from "../../components/PromoCard";
 import {
   isDisneyMickeyProvider
 } from "../../components/providerBubbleVariants";
 import { ServiceLogo } from "../../components/ServiceLogo";
 import { SubscriptionListItem } from "../../components/SubscriptionListItem";
+import { isPremiumPlan } from "../../constants/premium";
 import { useAppTranslation } from "../../i18n";
 import { useAppNavigation } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
@@ -73,6 +75,7 @@ export function DashboardScreen(): JSX.Element {
   const archiveSubscription = useWorkspaceStore((state) => state.archiveSubscription);
   const [showAnnualTotal, setShowAnnualTotal] = useState(true);
   const [archivingSubscriptionId, setArchivingSubscriptionId] = useState<string | null>(null);
+  const isPremium = isPremiumPlan(profile);
   const currency = profile?.currency ?? "EUR";
   const upcomingPayments = dashboard?.upcomingPayments ?? [];
   const insights = dashboard?.insights ?? [];
@@ -94,12 +97,17 @@ export function DashboardScreen(): JSX.Element {
     () => buildBubbleLayouts(width, isCompact, floatingSubscriptions, subscriptions),
     [floatingSubscriptions, isCompact, subscriptions, width]
   );
-  const summaryLabel = showAnnualTotal
+  const showYearlyForecast = showAnnualTotal;
+  const summaryLabel = showYearlyForecast
     ? t("dashboard.summaryYearly")
     : t("dashboard.summaryMonthly");
-  const summaryValue = showAnnualTotal
+  const summaryValue = showYearlyForecast
     ? dashboard?.yearlyEstimate ?? 0
     : dashboard?.monthlySpending ?? 0;
+  const visibleInsights = isPremium
+    ? insights
+    : insights.filter((insight) => insight.type === "payment_due");
+  const hiddenInsightCount = Math.max(insights.length - visibleInsights.length, 0);
 
   const handleArchiveSubscription = async (subscriptionId: string) => {
     if (archivingSubscriptionId) {
@@ -152,7 +160,9 @@ export function DashboardScreen(): JSX.Element {
               <Text style={[styles.summaryValue, isCompact ? styles.summaryValueCompactMobile : null]}>
                 {formatCurrency(summaryValue, currency)}
               </Text>
-              <Text style={styles.summaryHint}>{t("dashboard.tapToToggle")}</Text>
+              <Text style={styles.summaryHint}>
+                {t("dashboard.tapToToggle")}
+              </Text>
             </View>
           </Pressable>
 
@@ -175,6 +185,16 @@ export function DashboardScreen(): JSX.Element {
             </View>
           </View>
         </View>
+
+        {!isPremium ? (
+          <PromoCard
+            eyebrow="Plan gratuit"
+            title="Espace sponsorise"
+            body="Le plan gratuit affiche des cartes sponsorisees dans l'app. Le Premium retire ces emplacements et ouvre les statistiques avancees."
+            ctaLabel="Passer au Premium"
+            onPress={() => navigation.navigate("Profile")}
+          />
+        ) : null}
 
         <View style={styles.clusterWrap}>
           <View style={styles.clusterCaptionRow}>
@@ -226,6 +246,14 @@ export function DashboardScreen(): JSX.Element {
               <Text style={styles.emptyBody}>
                 {error ?? t("dashboard.addFirstService")}
               </Text>
+              {!isLoading ? (
+                <Pressable
+                  style={styles.inlineCtaButton}
+                  onPress={() => navigation.navigate("AddSubscription")}
+                >
+                  <Text style={styles.inlineCtaButtonLabel}>Ajouter mon premier abonnement</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             homeSubscriptions.map((entry) => (
@@ -234,6 +262,7 @@ export function DashboardScreen(): JSX.Element {
                 subscription={entry.subscription}
                 isIncludedLink={entry.isIncludedLink}
                 linkedParentProviderNames={entry.linkedParentProviderNames}
+                linkedParentSubscriptions={entry.linkedParentSubscriptions}
                 isDueSoon={
                   entry.isIncludedLink
                     ? false
@@ -303,7 +332,7 @@ export function DashboardScreen(): JSX.Element {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("dashboard.quickAlerts")}</Text>
-          {insights.length === 0 ? (
+          {visibleInsights.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>{t("dashboard.everythingUnderControl")}</Text>
               <Text style={styles.emptyBody}>
@@ -311,13 +340,43 @@ export function DashboardScreen(): JSX.Element {
               </Text>
             </View>
           ) : (
-            insights.map((insight, index) => (
+            visibleInsights.map((insight, index) => (
               <View key={`${insight.type}_${index}`} style={styles.insightCard}>
                 <Text style={styles.insightTitle}>{formatInsightTitle(insight.type)}</Text>
                 <Text style={styles.insightBody}>{insight.message}</Text>
+                <Pressable
+                  style={styles.insightButton}
+                  onPress={() =>
+                    navigation.navigate(
+                      insight.type === "payment_due" ? "Statistics" : "Subscriptions"
+                    )
+                  }
+                >
+                  <Text style={styles.insightButtonLabel}>
+                    {insight.type === "duplicate_subscription"
+                      ? "Comparer mes doublons"
+                      : insight.type === "unused_subscription"
+                        ? "Verifier mes usages"
+                        : "Ouvrir la vue detaillee"}
+                  </Text>
+                </Pressable>
               </View>
             ))
           )}
+          {!isPremium ? (
+            <PromoCard
+              eyebrow="Premium"
+              title="Detection peu utile et doublons"
+              body={
+                hiddenInsightCount > 0
+                  ? `${hiddenInsightCount} alerte(s) intelligente(s) restent reservees au Premium pour t'aider a reperer les services peu utiles et les doublons.`
+                  : "Passe au Premium pour debloquer les alertes intelligentes sur les doublons et les abonnements peu utiles."
+              }
+              ctaLabel="Voir les avantages"
+              onPress={() => navigation.navigate("Profile")}
+              tone="purple"
+            />
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -2596,6 +2655,23 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 20,
     color: theme.colors.textPrimary
   },
+  insightButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.xs,
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong
+  },
+  insightButtonLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
+  },
   emptyCard: {
     backgroundColor: theme.colors.surfaceRaised,
     borderRadius: radius.md,
@@ -2614,6 +2690,23 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: theme.colors.textSecondary
+  },
+  inlineCtaButton: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
+    minHeight: 40,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.warning
+  },
+  inlineCtaButtonLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#241602"
   }
 });
 

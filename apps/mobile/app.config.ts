@@ -14,10 +14,45 @@ type FirebaseExtraConfig = {
 function deriveAuthEmulatorUrl(apiBaseUrl: string): string | null {
   try {
     const url = new URL(apiBaseUrl);
+
+    if (!isLocalApiHost(url.hostname)) {
+      return null;
+    }
+
     return `${url.protocol}//${url.hostname}:9099`;
   } catch {
     return null;
   }
+}
+
+function isLocalApiHost(hostname: string): boolean {
+  const normalizedHost = hostname.trim().toLowerCase();
+
+  if (
+    normalizedHost === "localhost" ||
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "10.0.2.2"
+  ) {
+    return true;
+  }
+
+  if (normalizedHost.endsWith(".local")) {
+    return true;
+  }
+
+  if (normalizedHost.startsWith("192.168.") || normalizedHost.startsWith("10.")) {
+    return true;
+  }
+
+  const private172Match = normalizedHost.match(/^172\.(\d{1,2})\./);
+
+  if (!private172Match) {
+    return false;
+  }
+
+  const secondOctet = Number(private172Match[1]);
+
+  return secondOctet >= 16 && secondOctet <= 31;
 }
 
 function loadDefaultFirebaseProjectId(): string | null {

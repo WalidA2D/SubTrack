@@ -22,13 +22,16 @@ import {
   type LegalDocumentId
 } from "../../constants/legalDocuments";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { PromoCard } from "../../components/PromoCard";
 import { Screen } from "../../components/Screen";
+import { isPremiumPlan } from "../../constants/premium";
 import { useAppTranslation } from "../../i18n";
 import { authService } from "../../services/authService";
 import { sublyApi } from "../../services/sublyApi";
 import { useAppNavigation } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { AppTheme, radius, spacing, useAppTheme } from "../../theme";
+import { formatReminderDays } from "../../utils/format";
 
 type LegalLink = {
   id: LegalDocumentId;
@@ -44,10 +47,12 @@ export function SettingsScreen(): JSX.Element {
   const { t } = useAppTranslation();
   const styles = createStyles(theme);
   const profile = useWorkspaceStore((state) => state.profile);
-  const isUpdatingSettings = useWorkspaceStore((state) => state.isLoading);
+  const isUpdatingSettings = useWorkspaceStore((state) => state.isUpdatingSettings);
   const updateSettings = useWorkspaceStore((state) => state.updateSettings);
   const resetWorkspace = useWorkspaceStore((state) => state.reset);
   const preferences = profile?.notificationPreferences;
+  const defaultReminderDaysBefore = preferences?.defaultReminderDaysBefore ?? 3;
+  const isPremium = isPremiumPlan(profile);
   const [currentPassword, setCurrentPassword] = useState("");
   const [nextPassword, setNextPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -58,6 +63,19 @@ export function SettingsScreen(): JSX.Element {
   const currentCurrency = profile?.currency ?? "EUR";
   const activeCurrencyOption =
     ALL_CURRENCY_OPTIONS.find((option) => option.code === currentCurrency) ?? null;
+
+  const handleOpenPremium = (feature: string) => {
+    Alert.alert("Disponible avec Premium", `${feature} fait partie des avantages Premium.`, [
+      {
+        text: "Plus tard",
+        style: "cancel"
+      },
+      {
+        text: "Voir Premium",
+        onPress: () => navigation.navigate("Profile")
+      }
+    ]);
+  };
 
   const legalLinks = useMemo<LegalLink[]>(
     () =>
@@ -93,6 +111,41 @@ export function SettingsScreen(): JSX.Element {
       await updateSettings({
         notificationPreferences: {
           [field]: value
+        }
+      });
+    } catch (error) {
+      Alert.alert(
+        t("settings.updateErrorTitle"),
+        error instanceof Error ? error.message : t("common.retry")
+      );
+    }
+  };
+
+  const handleColorBlindToggle = async (value: boolean) => {
+    try {
+      await updateSettings({ colorBlindMode: value });
+    } catch (error) {
+      Alert.alert(
+        t("settings.updateErrorTitle"),
+        error instanceof Error ? error.message : t("common.retry")
+      );
+    }
+  };
+
+  const handleDefaultReminderChange = async (value: number) => {
+    if (!isPremium) {
+      handleOpenPremium("Les rappels personnalises");
+      return;
+    }
+
+    if (value === defaultReminderDaysBefore) {
+      return;
+    }
+
+    try {
+      await updateSettings({
+        notificationPreferences: {
+          defaultReminderDaysBefore: value
         }
       });
     } catch (error) {
@@ -256,6 +309,61 @@ export function SettingsScreen(): JSX.Element {
           styles={styles}
           theme={theme}
         />
+        <SettingsRow
+          label="Mode daltonien"
+          value={profile?.colorBlindMode ?? false}
+          onValueChange={(value) => void handleColorBlindToggle(value)}
+          disabled={isUpdatingSettings || isDeletingAccount}
+          styles={styles}
+          theme={theme}
+        />
+
+        <View style={styles.reminderCard}>
+          <Text style={styles.infoLabel}>Rappel par defaut</Text>
+          <Text style={styles.infoValue}>{formatReminderDays(defaultReminderDaysBefore)}</Text>
+          <Text style={styles.helper}>
+            {isPremium
+              ? "Ce delai est pre-rempli quand tu ajoutes un nouvel abonnement, puis reste modifiable fiche par fiche."
+              : "Le plan gratuit utilise des rappels simples. Passe au Premium pour personnaliser le delai au niveau du compte et de chaque abonnement."}
+          </Text>
+          <View style={styles.reminderChipRow}>
+            {[0, 1, 3, 5, 7, 14].map((value) => {
+              const isActive = defaultReminderDaysBefore === value;
+
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => void handleDefaultReminderChange(value)}
+                  disabled={isUpdatingSettings || isDeletingAccount}
+                  style={[
+                    styles.reminderChip,
+                    isActive ? styles.reminderChipActive : null
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.reminderChipLabel,
+                      isActive ? styles.reminderChipLabelActive : null
+                    ]}
+                  >
+                    {value === 0 ? "Jour J" : `${value} j`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {!isPremium ? (
+          <PromoCard
+            eyebrow="Premium"
+            title="Rappels personnalises"
+            body="Choisis un delai de rappel par defaut pour tout le compte et ajuste ensuite chaque abonnement selon ton rythme."
+            ctaLabel="Voir le Premium"
+            onPress={() => navigation.navigate("Profile")}
+            tone="purple"
+          />
+        ) : null}
 
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>{t("settings.activeCurrency")}</Text>
@@ -513,6 +621,42 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 13,
       lineHeight: 19,
       color: theme.colors.textSecondary
+    },
+    reminderCard: {
+      marginTop: spacing.xs,
+      padding: spacing.md,
+      gap: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    reminderChipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.sm
+    },
+    reminderChip: {
+      minHeight: 38,
+      paddingHorizontal: spacing.md,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 999,
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    reminderChipActive: {
+      backgroundColor: theme.colors.surfaceContrast,
+      borderColor: theme.colors.primary
+    },
+    reminderChipLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.colors.textSecondary
+    },
+    reminderChipLabelActive: {
+      color: theme.colors.primary
     },
     infoCard: {
       marginTop: spacing.xs,

@@ -62,4 +62,5 @@ npm run functions:serve
 npm run seed:emulator
 npm run mobile
 
-
+prod
+node .\node_modules\firebase-tools\lib\bin\firebase.js deploy --project subtrack-fb908 --only functions,firestore,storage

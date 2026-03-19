@@ -58,6 +58,8 @@ export const subscriptionSchema = z.object({
   notes: z.string().max(500).optional(),
   trialEndsAt: z.string().nullable().optional(),
   lastUsedAt: z.string().nullable().optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
+  accessEndsAt: z.string().nullable().optional(),
   usageCheckIn: usageCheckInSchema.default("active"),
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -9,10 +9,17 @@ export type LegalDocumentId =
   | "retention"
   | "permissions";
 
+export type LegalDocumentFaqItem = {
+  question: string;
+  answer: string;
+};
+
 export type LegalDocumentSection = {
   title: string;
+  summary?: string;
   paragraphs?: string[];
   bullets?: string[];
+  faqItems?: LegalDocumentFaqItem[];
 };
 
 export type LegalDocumentDefinition = {
@@ -53,41 +60,88 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentId, LegalDocumentDefinition> =
     sections: [
       {
         title: "Compte et connexion",
-        bullets: [
-          "Si tu as oublie ton mot de passe, utilise l'option de reinitialisation sur l'ecran de connexion.",
-          "Tu peux changer ton mot de passe directement depuis les reglages, dans la rubrique securite du compte.",
-          "Si ton compte est en attente de suppression, l'acces est bloque jusqu'a la suppression definitive."
+        summary: "Acces au compte, mot de passe et securite",
+        faqItems: [
+          {
+            question: "J'ai oublie mon mot de passe, comment le reinitialiser ?",
+            answer: "Utilise l'option de reinitialisation disponible sur l'ecran de connexion pour recevoir les instructions de recuperation."
+          },
+          {
+            question: "Ou puis-je modifier mon mot de passe ?",
+            answer: "Le changement de mot de passe se fait depuis les reglages, dans la rubrique securite du compte."
+          },
+          {
+            question: "Pourquoi mon compte est-il bloque apres une demande de suppression ?",
+            answer: "Lorsqu'un compte est en attente de suppression, l'acces est bloque jusqu'a la suppression definitive pour eviter toute reutilisation accidentelle."
+          }
         ]
       },
       {
         title: "Abonnements et rappels",
-        bullets: [
-          "Tu peux ajouter un abonnement manuellement depuis le catalogue ou en mode personnalise.",
-          "Les rappels de paiement, de fin d'essai et certaines alertes peuvent etre actives ou desactivees dans les reglages.",
-          "Les frequences hebdomadaire, mensuelle, trimestrielle et annuelle sont prises en charge."
+        summary: "Ajout, frequences et alertes utiles",
+        faqItems: [
+          {
+            question: "Comment ajouter un abonnement ?",
+            answer: "Tu peux creer un abonnement manuellement depuis le catalogue ou utiliser le mode personnalise selon ton besoin."
+          },
+          {
+            question: "Puis-je desactiver certains rappels ?",
+            answer: "Oui. Les rappels de paiement, de fin d'essai et certaines alertes se gerent directement dans les reglages."
+          },
+          {
+            question: "Quelles frequences sont prises en charge ?",
+            answer: "Subly gere les frequences hebdomadaire, mensuelle, trimestrielle et annuelle."
+          }
         ]
       },
       {
         title: "Services inclus et abonnements lies",
-        bullets: [
-          "Un abonnement peut inclure d'autres services lorsqu'ils sont compris dans l'offre principale.",
-          "Les services lies apparaissent dans les listes avec une mention d'association, sans etre affiches dans les bulles interactives.",
-          "Sur le plan gratuit, le nombre de services inclus par abonnement est limite. Le plan premium retire cette limite."
+        summary: "Offres groupees et relations entre services",
+        faqItems: [
+          {
+            question: "Puis-je rattacher plusieurs services a un meme abonnement ?",
+            answer: "Oui. Un abonnement peut inclure d'autres services lorsqu'ils font partie de l'offre principale."
+          },
+          {
+            question: "Ou apparaissent les services lies dans l'application ?",
+            answer: "Ils sont visibles dans les listes avec une mention d'association, mais ne s'affichent pas dans les bulles interactives."
+          },
+          {
+            question: "Y a-t-il une limite sur le plan gratuit ?",
+            answer: "Oui. Le plan gratuit garde des limites sur les services inclus par abonnement et reste centre sur le suivi simple, alors que le premium ouvre les statistiques avancees, le calendrier des prelevements, les rappels personnalises, la detection des doublons et la suppression des pubs."
+          }
         ]
       },
       {
         title: "Suppression du compte",
-        paragraphs: [
-          `Quand tu demandes la suppression, le compte est desactive tout de suite puis archive pendant ${ACCOUNT_DELETION_RETENTION_DAYS} jours pour des raisons de securite.`,
-          "A l'issue de ce delai, les donnees reliees au compte sont supprimees definitivement."
+        summary: "Desactivation immediate puis retention de securite",
+        faqItems: [
+          {
+            question: "Que se passe-t-il juste apres ma demande de suppression ?",
+            answer: `Le compte est desactive immediatement puis archive pendant ${ACCOUNT_DELETION_RETENTION_DAYS} jours pour des raisons de securite.`
+          },
+          {
+            question: "Quand mes donnees sont-elles effacees definitivement ?",
+            answer: "A la fin de la periode d'archivage, les donnees reliees au compte sont supprimees definitivement."
+          }
         ]
       },
       {
         title: "Support et donnees personnelles",
-        bullets: [
-          "Pour une question de support, tu peux utiliser l'adresse support indiquee dans les informations legales.",
-          "Pour exercer un droit RGPD, utilise les coordonnees indiquees dans la rubrique donnees personnelles et droits RGPD.",
-          "La FAQ complete les autres pages mais ne remplace pas les conditions d'utilisation, la politique de confidentialite ou les informations legales."
+        summary: "Assistance, RGPD et documents utiles",
+        faqItems: [
+          {
+            question: "Comment contacter le support ?",
+            answer: "Pour toute question d'assistance, utilise l'adresse de support mentionnee dans les informations legales."
+          },
+          {
+            question: "Comment exercer un droit RGPD ?",
+            answer: "Les coordonnees a utiliser figurent dans la rubrique dediee aux donnees personnelles et aux droits RGPD."
+          },
+          {
+            question: "La FAQ remplace-t-elle les autres documents legaux ?",
+            answer: "Non. Elle complete les autres pages mais ne remplace pas les conditions d'utilisation, la politique de confidentialite ni les informations legales."
+          }
         ]
       }
     ]

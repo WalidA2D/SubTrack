@@ -8,6 +8,7 @@ type OverlayName =
   | "BubbleGallery"
   | "Subscriptions"
   | "SubscriptionDetails"
+  | "StatisticsCalendar"
   | "Profile"
   | "Settings"
   | "LegalDocument";
@@ -28,6 +29,10 @@ type OverlayRoute =
   | {
       name: "SubscriptionDetails";
       params: RootStackParamList["SubscriptionDetails"];
+    }
+  | {
+      name: "StatisticsCalendar";
+      params?: RootStackParamList["StatisticsCalendar"];
     }
   | {
       name: "Profile";

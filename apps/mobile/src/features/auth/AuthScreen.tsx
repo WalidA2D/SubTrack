@@ -16,15 +16,35 @@ export function AuthScreen(): JSX.Element {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const trimmedEmail = email.trim();
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
+  const isPasswordValid = password.length >= 8;
+  const isDisplayNameValid = !isRegisterMode || displayName.trim().length >= 2;
+  const canSubmit = isEmailValid && isPasswordValid && isDisplayNameValid && !isSubmitting;
 
   const handleSubmit = async () => {
+    if (!isEmailValid) {
+      Alert.alert(t("auth.loginErrorTitle"), "Renseigne une adresse email valide.");
+      return;
+    }
+
+    if (!isPasswordValid) {
+      Alert.alert(t("auth.loginErrorTitle"), "Le mot de passe doit contenir au moins 8 caracteres.");
+      return;
+    }
+
+    if (!isDisplayNameValid) {
+      Alert.alert(t("auth.loginErrorTitle"), "Ajoute un nom d'affichage d'au moins 2 caracteres.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
       if (isRegisterMode) {
-        await authService.register(email.trim(), password, displayName.trim());
+        await authService.register(trimmedEmail, password, displayName.trim());
       } else {
-        await authService.signIn(email.trim(), password);
+        await authService.signIn(trimmedEmail, password);
       }
     } catch (error) {
       Alert.alert(
@@ -37,8 +57,13 @@ export function AuthScreen(): JSX.Element {
   };
 
   const handleResetPassword = async () => {
+    if (!isEmailValid) {
+      Alert.alert(t("auth.resetErrorTitle"), "Renseigne d'abord une adresse email valide.");
+      return;
+    }
+
     try {
-      await authService.sendPasswordReset(email.trim());
+      await authService.sendPasswordReset(trimmedEmail);
       Alert.alert(t("auth.resetSentTitle"), t("auth.resetSentBody"));
     } catch (error) {
       Alert.alert(
@@ -84,15 +109,25 @@ export function AuthScreen(): JSX.Element {
         <PrimaryButton
           title={isRegisterMode ? t("auth.createAccount") : t("auth.signIn")}
           onPress={handleSubmit}
-          disabled={isSubmitting}
+          disabled={!canSubmit}
         />
         {!isRegisterMode ? (
           <PrimaryButton
             title={t("auth.forgotPassword")}
             onPress={handleResetPassword}
             variant="secondary"
+            disabled={!isEmailValid || isSubmitting}
           />
         ) : null}
+        <Text style={styles.helperText}>
+          {!isEmailValid
+            ? "Utilise une adresse email valide."
+            : !isPasswordValid
+              ? "Le mot de passe doit contenir au moins 8 caracteres."
+              : isRegisterMode && !isDisplayNameValid
+                ? "Ajoute un nom visible d'au moins 2 caracteres."
+                : "Tes identifiants sont prets."}
+        </Text>
       </View>
 
       <View style={styles.footer}>
@@ -126,6 +161,11 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 16,
       color: theme.colors.textPrimary,
       backgroundColor: theme.colors.surface
+    },
+    helperText: {
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.colors.textSecondary
     },
     footer: {
       alignItems: "center",

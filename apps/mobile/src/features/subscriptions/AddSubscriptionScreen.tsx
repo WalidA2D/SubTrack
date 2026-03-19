@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -27,17 +29,23 @@ import {
   type SubscriptionLogoMode
 } from "@subly/shared";
 
+import { DateField } from "../../components/DateField";
 import { PrimaryButton } from "../../components/PrimaryButton";
+import { PromoCard } from "../../components/PromoCard";
 import { ServiceLogo } from "../../components/ServiceLogo";
+import { isPremiumPlan } from "../../constants/premium";
 import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
 import {
   buildCategoryId,
   formatCurrency,
+  formatReminderDays,
   toDateInputValue,
   toIsoDate
 } from "../../utils/format";
+
+type ComposerStep = "service" | "billing" | "options";
 
 const FREQUENCY_OPTIONS: Array<{ label: string; value: BillingFrequency }> = [
   { label: "Hebdo", value: "weekly" },
@@ -69,6 +77,12 @@ const LOGO_MODE_OPTIONS: Array<{
 ];
 
 const DEFAULT_REMINDER_DAYS = "3";
+const SCROLL_TO_TOP_VISIBILITY_OFFSET = 260;
+const COMPOSER_STEPS: Array<{ id: ComposerStep; label: string; eyebrow: string }> = [
+  { id: "service", label: "Service", eyebrow: "1" },
+  { id: "billing", label: "Facturation", eyebrow: "2" },
+  { id: "options", label: "Options", eyebrow: "3" }
+];
 
 export function AddSubscriptionScreen(): JSX.Element {
   const { width } = useWindowDimensions();
@@ -81,7 +95,7 @@ export function AddSubscriptionScreen(): JSX.Element {
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const profile = useWorkspaceStore((state) => state.profile);
   const saveSubscription = useWorkspaceStore((state) => state.saveSubscription);
-  const isSaving = useWorkspaceStore((state) => state.isLoading);
+  const isSaving = useWorkspaceStore((state) => state.isSavingSubscription);
   const subscriptionId =
     route?.name === "AddSubscription" ? route.params?.subscriptionId : undefined;
   const existingSubscription = useMemo(
@@ -92,6 +106,7 @@ export function AddSubscriptionScreen(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [isComposerVisible, setComposerVisible] = useState(false);
+  const [composerStep, setComposerStep] = useState<ComposerStep>("service");
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [providerName, setProviderName] = useState("");
   const [price, setPrice] = useState("");
@@ -105,9 +120,16 @@ export function AddSubscriptionScreen(): JSX.Element {
   const [includedServiceQuery, setIncludedServiceQuery] = useState("");
   const [logoMode, setLogoMode] = useState<SubscriptionLogoMode>("option");
   const [notes, setNotes] = useState("");
+  const [showScrollTopButton, setShowScrollTopButton] = useState(false);
+  const catalogScrollRef = useRef<ScrollView | null>(null);
+  const priceInputRef = useRef<TextInput | null>(null);
 
   const isEditing =
     route?.name === "AddSubscription" && Boolean(route.params?.subscriptionId);
+  const accountDefaultReminderDays = String(
+    profile?.notificationPreferences?.defaultReminderDaysBefore ?? Number(DEFAULT_REMINDER_DAYS)
+  );
+  const isPremium = isPremiumPlan(profile);
 
   const selectedPreset = useMemo(() => {
     if (selectedPresetId) {
@@ -230,7 +252,7 @@ export function AddSubscriptionScreen(): JSX.Element {
   }, [includedProviderNames, includedServiceDirectory, includedServiceQuery, providerName]);
 
   const includedServiceLimit =
-    profile?.planTier === "premium"
+    isPremium
       ? PREMIUM_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION
       : FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION;
   const hasUnlimitedIncludedServices = !Number.isFinite(includedServiceLimit);
@@ -275,6 +297,7 @@ export function AddSubscriptionScreen(): JSX.Element {
       return;
     }
 
+    setComposerStep("service");
     const preset = findServicePresetByProvider(existingSubscription.providerName);
     setSelectedPresetId(preset?.id ?? null);
     setProviderName(existingSubscription.providerName);
@@ -305,16 +328,42 @@ export function AddSubscriptionScreen(): JSX.Element {
     );
   }, [providerName]);
 
+  useEffect(() => {
+    if (!isComposerVisible || composerStep !== "billing") {
+      return;
+    }
+
+    const focusTimeout = setTimeout(() => {
+      priceInputRef.current?.focus();
+    }, 180);
+
+    return () => clearTimeout(focusTimeout);
+  }, [composerStep, isComposerVisible]);
+
+  const handleCatalogScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const shouldShowButton =
+      event.nativeEvent.contentOffset.y > SCROLL_TO_TOP_VISIBILITY_OFFSET;
+
+    setShowScrollTopButton((current) =>
+      current === shouldShowButton ? current : shouldShowButton
+    );
+  };
+
+  const scrollCatalogToTop = () => {
+    catalogScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const openPresetComposer = (preset: ServicePreset) => {
     const servicePlanPreset = findServicePlanPresetByPresetId(preset.id);
 
+    setComposerStep("service");
     setSelectedPresetId(preset.id);
     setProviderName(servicePlanPreset?.options[0]?.providerName ?? preset.providerName);
     setPrice("");
     setCategory(preset.categoryName);
     setFrequency(preset.billingFrequency);
     setNextBillingDate(getSuggestedDate(preset.billingFrequency));
-    setReminderDaysBefore(DEFAULT_REMINDER_DAYS);
+    setReminderDaysBefore(accountDefaultReminderDays);
     setHasFreeTrial(false);
     setTrialEndsAt("");
     setIncludedProviderNames([]);
@@ -329,13 +378,14 @@ export function AddSubscriptionScreen(): JSX.Element {
       PREDEFINED_CATEGORY_PRESETS.find((preset) => preset.slug === selectedFilter)?.name ??
       "Streaming";
 
+    setComposerStep("service");
     setSelectedPresetId(null);
     setProviderName("");
     setPrice("");
     setCategory(activeCategory);
     setFrequency("monthly");
     setNextBillingDate(getSuggestedDate("monthly"));
-    setReminderDaysBefore(DEFAULT_REMINDER_DAYS);
+    setReminderDaysBefore(accountDefaultReminderDays);
     setHasFreeTrial(false);
     setTrialEndsAt("");
     setIncludedProviderNames([]);
@@ -351,6 +401,7 @@ export function AddSubscriptionScreen(): JSX.Element {
       return;
     }
 
+    setComposerStep("service");
     setComposerVisible(false);
   };
 
@@ -387,9 +438,105 @@ export function AddSubscriptionScreen(): JSX.Element {
     );
   };
 
+  const validateServiceStep = () => {
+    if (!providerName.trim() || !category.trim()) {
+      Alert.alert(
+        "Informations manquantes",
+        "Choisis d'abord le service et la categorie a suivre."
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateBillingStep = () => {
+    const parsedPrice = Number(price.replace(",", "."));
+    const parsedReminderDays = isPremium
+      ? Number(reminderDaysBefore)
+      : Number(accountDefaultReminderDays);
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      Alert.alert("Prix invalide", "Entre un montant superieur a zero.");
+      return false;
+    }
+
+    if (!nextBillingDate.trim()) {
+      Alert.alert("Date manquante", "Ajoute la prochaine date de facturation.");
+      return false;
+    }
+
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(nextBillingDate.trim())) {
+      Alert.alert("Date invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      return false;
+    }
+
+    if (!Number.isFinite(parsedReminderDays) || parsedReminderDays < 0) {
+      Alert.alert("Rappel invalide", "Le nombre de jours doit etre positif.");
+      return false;
+    }
+
+    if (hasFreeTrial && !trialEndsAt.trim()) {
+      Alert.alert("Essai gratuit incomplet", "Indique la date de fin de l'essai gratuit.");
+      return false;
+    }
+
+    if (hasFreeTrial && !/^\d{2}\/\d{2}\/\d{4}$/.test(trialEndsAt.trim())) {
+      Alert.alert("Date d'essai invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const goToComposerStep = (nextStep: ComposerStep) => {
+    if (nextStep === composerStep) {
+      return;
+    }
+
+    const currentIndex = COMPOSER_STEPS.findIndex((step) => step.id === composerStep);
+    const nextIndex = COMPOSER_STEPS.findIndex((step) => step.id === nextStep);
+
+    if (nextIndex < currentIndex) {
+      setComposerStep(nextStep);
+      return;
+    }
+
+    if (currentIndex === 0 && !validateServiceStep()) {
+      return;
+    }
+
+    if (nextIndex >= 2 && !validateBillingStep()) {
+      return;
+    }
+
+    setComposerStep(nextStep);
+  };
+
+  const handleNextComposerStep = () => {
+    if (composerStep === "service") {
+      if (!validateServiceStep()) {
+        return;
+      }
+
+      setComposerStep("billing");
+      return;
+    }
+
+    if (composerStep === "billing") {
+      if (!validateBillingStep()) {
+        return;
+      }
+
+      setComposerStep("options");
+    }
+  };
+
   const handleSave = async () => {
     const parsedPrice = Number(price.replace(",", "."));
-    const parsedReminderDays = Number(reminderDaysBefore);
+    const parsedReminderDays = isPremium
+      ? Number(reminderDaysBefore)
+      : Number(accountDefaultReminderDays);
     const trimmedTrialEndDate = trialEndsAt.trim();
     let nextBillingIso: string;
     let trialEndIso: string | null = null;
@@ -502,13 +649,19 @@ export function AddSubscriptionScreen(): JSX.Element {
         <View style={[styles.glow, styles.glowOrange]} />
         <View style={[styles.glow, styles.glowPurple]} />
       </View>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={catalogScrollRef}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleCatalogScroll}
+        scrollEventThrottle={16}
+      >
         <View style={[styles.header, isCompact ? styles.headerCompact : null]}>
           <Pressable onPress={navigation.goBack} style={styles.circleButton}>
             <Text style={styles.circleButtonLabel}>{"<"}</Text>
           </Pressable>
           <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>
-            Ajouter un abonnement
+            {isEditing ? "Modifier un abonnement" : "Ajouter un abonnement"}
           </Text>
           <Pressable
             onPress={openCustomComposer}
@@ -561,8 +714,9 @@ export function AddSubscriptionScreen(): JSX.Element {
         <View style={styles.helperCard}>
           <Text style={styles.helperTitle}>Catalogue Subly</Text>
           <Text style={styles.helperBody}>
-            La liste est prechargee comme dans ta reference. Tu touches un service et on
-            ouvre une modal deja pre-remplie, sans renseigner le prix.
+            Choisis un service pour ouvrir une creation guidee en trois etapes. Le rappel
+            par defaut de ton compte est actuellement regle sur{" "}
+            {formatReminderDays(Number(accountDefaultReminderDays)).toLowerCase()}.
           </Text>
         </View>
 
@@ -612,6 +766,12 @@ export function AddSubscriptionScreen(): JSX.Element {
           </View>
         </Pressable>
       </ScrollView>
+
+      {showScrollTopButton ? (
+        <Pressable style={styles.scrollTopButton} onPress={scrollCatalogToTop}>
+          <Text style={styles.scrollTopButtonLabel}>↑</Text>
+        </Pressable>
+      ) : null}
 
       <Modal
         animationType="slide"
@@ -670,340 +830,534 @@ export function AddSubscriptionScreen(): JSX.Element {
                 </View>
               )}
 
+              <View style={styles.stepperRow}>
+                {COMPOSER_STEPS.map((step) => {
+                  const isActive = composerStep === step.id;
+                  const isCompleted =
+                    (step.id === "service" && composerStep !== "service") ||
+                    (step.id === "billing" && composerStep === "options");
+
+                  return (
+                    <Pressable
+                      key={step.id}
+                      onPress={() => goToComposerStep(step.id)}
+                      style={[
+                        styles.stepperChip,
+                        isActive ? styles.stepperChipActive : null,
+                        isCompleted ? styles.stepperChipCompleted : null
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.stepperEyebrow,
+                          isActive ? styles.stepperEyebrowActive : null
+                        ]}
+                      >
+                        {isCompleted ? "OK" : step.eyebrow}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.stepperLabel,
+                          isActive ? styles.stepperLabelActive : null
+                        ]}
+                      >
+                        {step.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.sheetContent}
               >
-                {selectedServicePlanPreset ? (
+                {composerStep === "service" ? (
                   <>
-                    <View style={styles.field}>
-                      <Text style={styles.label}>Nom du service</Text>
-                      <View style={styles.lockedInput}>
-                        <Text style={styles.lockedInputValue}>
-                          {selectedServicePlanPreset.baseProviderName}
-                        </Text>
-                        <Text style={styles.lockedInputHint}>{providerName}</Text>
-                      </View>
+                    <View style={styles.stepInfoCard}>
+                      <Text style={styles.stepInfoTitle}>Etape 1</Text>
+                      <Text style={styles.stepInfoBody}>
+                        Choisis le service suivi, la formule si besoin, puis la categorie qui
+                        alimentera les listes et les statistiques.
+                      </Text>
                     </View>
 
-                    <View style={styles.field}>
-                      <Text style={styles.label}>{selectedServicePlanPreset.selectorLabel}</Text>
-                      <View style={styles.specialOptionSectionStack}>
-                        {specialPresetSections.map((section) => (
-                          <View key={section.id} style={styles.specialOptionSection}>
-                            {section.title ? (
-                              <Text style={styles.specialOptionSectionTitle}>{section.title}</Text>
-                            ) : null}
-                            <View style={styles.passOptionStack}>
-                              {section.options.map((option) => {
-                                const isActive = option.providerName === providerName;
+                    {selectedServicePlanPreset ? (
+                      <>
+                        <View style={styles.field}>
+                          <Text style={styles.label}>Nom du service</Text>
+                          <View style={styles.lockedInput}>
+                            <Text style={styles.lockedInputValue}>
+                              {selectedServicePlanPreset.baseProviderName}
+                            </Text>
+                            <Text style={styles.lockedInputHint}>{providerName}</Text>
+                          </View>
+                        </View>
 
-                                return (
-                                  <Pressable
-                                    key={option.id}
-                                    onPress={() => setProviderName(option.providerName)}
+                        <View style={styles.field}>
+                          <Text style={styles.label}>{selectedServicePlanPreset.selectorLabel}</Text>
+                          <View style={styles.specialOptionSectionStack}>
+                            {specialPresetSections.map((section) => (
+                              <View key={section.id} style={styles.specialOptionSection}>
+                                {section.title ? (
+                                  <Text style={styles.specialOptionSectionTitle}>{section.title}</Text>
+                                ) : null}
+                                <View style={styles.passOptionStack}>
+                                  {section.options.map((option) => {
+                                    const isActive = option.providerName === providerName;
+
+                                    return (
+                                      <Pressable
+                                        key={option.id}
+                                        onPress={() => setProviderName(option.providerName)}
+                                        style={[
+                                          styles.passOptionCard,
+                                          isActive ? styles.passOptionCardActive : null
+                                        ]}
+                                      >
+                                        <View style={styles.passOptionIdentity}>
+                                          <ServiceLogo providerName={option.providerName} size={48} />
+                                          <View style={styles.passOptionText}>
+                                            <Text style={styles.passOptionTitle}>
+                                              {option.providerName}
+                                            </Text>
+                                            <Text style={styles.passOptionBody}>
+                                              {section.description ??
+                                                "Visuel officiel adapte a cette formule."}
+                                            </Text>
+                                          </View>
+                                        </View>
+                                        <Text
+                                          style={[
+                                            styles.passOptionStatus,
+                                            isActive ? styles.passOptionStatusActive : null
+                                          ]}
+                                        >
+                                          {isActive ? "Selectionne" : "Choisir"}
+                                        </Text>
+                                      </Pressable>
+                                    );
+                                  })}
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+
+                        <View style={styles.field}>
+                          <Text style={styles.label}>Logo affiche</Text>
+                          <Text style={styles.fieldHint}>
+                            Choisis si tu veux garder le visuel de la formule selectionnee ou
+                            revenir au logo principal de {selectedServicePlanPreset.baseProviderName}.
+                          </Text>
+                          <View style={styles.logoModeStack}>
+                            {LOGO_MODE_OPTIONS.map((option) => {
+                              const isActive = option.value === logoMode;
+
+                              return (
+                                <Pressable
+                                  key={option.value}
+                                  onPress={() => setLogoMode(option.value)}
+                                  style={[
+                                    styles.logoModeCard,
+                                    isActive ? styles.logoModeCardActive : null
+                                  ]}
+                                >
+                                  <View style={styles.logoModeText}>
+                                    <Text style={styles.logoModeTitle}>{option.label}</Text>
+                                    <Text style={styles.logoModeBody}>{option.description}</Text>
+                                  </View>
+                                  <Text
                                     style={[
-                                      styles.passOptionCard,
-                                      isActive ? styles.passOptionCardActive : null
+                                      styles.passOptionStatus,
+                                      isActive ? styles.passOptionStatusActive : null
                                     ]}
                                   >
-                                    <View style={styles.passOptionIdentity}>
-                                      <ServiceLogo providerName={option.providerName} size={48} />
-                                      <View style={styles.passOptionText}>
-                                        <Text style={styles.passOptionTitle}>
-                                          {option.providerName}
-                                        </Text>
-                                        <Text style={styles.passOptionBody}>
-                                          {section.description ??
-                                            "Visuel officiel adapte a cette formule."}
-                                        </Text>
-                                      </View>
-                                    </View>
-                                    <Text
-                                      style={[
-                                        styles.passOptionStatus,
-                                        isActive ? styles.passOptionStatusActive : null
-                                      ]}
-                                    >
-                                      {isActive ? "Selectionne" : "Choisir"}
-                                    </Text>
-                                  </Pressable>
-                                );
-                              })}
-                            </View>
+                                    {isActive ? "Selectionne" : "Choisir"}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
                           </View>
-                        ))}
-                      </View>
-                    </View>
-
+                        </View>
+                      </>
+                    ) : (
+                      <Field
+                        label="Nom du service"
+                        value={providerName}
+                        onChangeText={(value) => {
+                          setSelectedPresetId(null);
+                          setProviderName(value);
+                        }}
+                        placeholder="Ex: Prime Video, Revolut, Apple One"
+                      />
+                    )}
+                  </>
+                ) : null}
+                {composerStep === "service" ? (
+                  <>
                     <View style={styles.field}>
-                      <Text style={styles.label}>Logo affiche</Text>
-                      <Text style={styles.fieldHint}>
-                        Choisis si tu veux garder le visuel de la formule selectionnee ou
-                        revenir au logo principal de {selectedServicePlanPreset.baseProviderName}.
-                      </Text>
-                      <View style={styles.logoModeStack}>
-                        {LOGO_MODE_OPTIONS.map((option) => {
-                          const isActive = option.value === logoMode;
-
+                      <Text style={styles.label}>Categories rapides</Text>
+                      <View style={styles.categoryWrap}>
+                        {PREDEFINED_CATEGORY_PRESETS.map((preset) => {
+                          const isActive = preset.name === category;
                           return (
                             <Pressable
-                              key={option.value}
-                              onPress={() => setLogoMode(option.value)}
+                              key={preset.slug}
+                              onPress={() => setCategory(preset.name)}
                               style={[
-                                styles.logoModeCard,
-                                isActive ? styles.logoModeCardActive : null
+                                styles.categoryChip,
+                                isActive ? styles.categoryChipActive : null
                               ]}
                             >
-                              <View style={styles.logoModeText}>
-                                <Text style={styles.logoModeTitle}>{option.label}</Text>
-                                <Text style={styles.logoModeBody}>{option.description}</Text>
-                              </View>
                               <Text
                                 style={[
-                                  styles.passOptionStatus,
-                                  isActive ? styles.passOptionStatusActive : null
+                                  styles.categoryChipLabel,
+                                  isActive ? styles.categoryChipLabelActive : null
                                 ]}
                               >
-                                {isActive ? "Selectionne" : "Choisir"}
+                                {preset.name}
                               </Text>
                             </Pressable>
                           );
                         })}
                       </View>
                     </View>
-                  </>
-                ) : (
-                  <Field
-                    label="Nom du service"
-                    value={providerName}
-                    onChangeText={(value) => {
-                      setSelectedPresetId(null);
-                      setProviderName(value);
-                    }}
-                    placeholder="Ex: Prime Video, Revolut, Apple One"
-                  />
-                )}
-                <View style={[styles.duoRow, isCompact ? styles.duoRowCompact : null]}>
-                  <Field
-                    label="Prix"
-                    value={price}
-                    onChangeText={setPrice}
-                    keyboardType="decimal-pad"
-                    placeholder="8,99"
-                  />
-                  <View style={styles.field}>
-                    <Text style={styles.label}>Categorie</Text>
-                    <View style={styles.lockedInput}>
-                      <Text style={styles.lockedInputValue}>{category}</Text>
-                      <Text style={styles.lockedInputHint}>Choisie ci-dessous</Text>
+
+                    <View style={styles.stepSummaryCard}>
+                      <Text style={styles.stepSummaryLabel}>Categorie choisie</Text>
+                      <Text style={styles.stepSummaryValue}>{category}</Text>
                     </View>
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Categories rapides</Text>
-                  <View style={styles.categoryWrap}>
-                    {PREDEFINED_CATEGORY_PRESETS.map((preset) => {
-                      const isActive = preset.name === category;
-                      return (
-                        <Pressable
-                          key={preset.slug}
-                          onPress={() => setCategory(preset.name)}
-                          style={[
-                            styles.categoryChip,
-                            isActive ? styles.categoryChipActive : null
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.categoryChipLabel,
-                              isActive ? styles.categoryChipLabelActive : null
-                            ]}
-                          >
-                            {preset.name}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Frequence</Text>
-                  <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
-                    {FREQUENCY_OPTIONS.map((option) => (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => {
-                          setFrequency(option.value);
-                          if (!isEditing) {
-                            setNextBillingDate(getSuggestedDate(option.value));
-                          }
-                        }}
-                        style={[
-                          styles.frequencyChip,
-                          isCompact ? styles.frequencyChipCompact : null,
-                          frequency === option.value ? styles.frequencyChipActive : null
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.frequencyLabel,
-                            frequency === option.value ? styles.frequencyLabelActive : null
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Essai gratuit</Text>
-                  <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
-                    {TRIAL_OPTIONS.map((option) => {
-                      const isActive =
-                        (hasFreeTrial && option.value === "active") ||
-                        (!hasFreeTrial && option.value === "inactive");
-
-                      return (
-                        <Pressable
-                          key={option.value}
-                          onPress={() => {
-                            const nextHasFreeTrial = option.value === "active";
-                            setHasFreeTrial(nextHasFreeTrial);
-
-                            if (nextHasFreeTrial && !trialEndsAt.trim()) {
-                              setTrialEndsAt(nextBillingDate);
-                            }
-
-                            if (!nextHasFreeTrial) {
-                              setTrialEndsAt("");
-                            }
-                          }}
-                          style={[
-                            styles.frequencyChip,
-                            isCompact ? styles.frequencyChipCompact : null,
-                            isActive ? styles.frequencyChipActive : null
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.frequencyLabel,
-                              isActive ? styles.frequencyLabelActive : null
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <Text style={styles.fieldHint}>
-                    Active cette option si l'abonnement commence par une periode d'essai sans
-                    paiement.
-                  </Text>
-                </View>
-
-                {hasFreeTrial ? (
-                  <Field
-                    label="Fin de l'essai gratuit"
-                    value={trialEndsAt}
-                    onChangeText={setTrialEndsAt}
-                    placeholder="25/03/2026"
-                  />
+                  </>
                 ) : null}
 
-                <Field
-                  label={hasFreeTrial ? "Premier paiement apres essai" : "Prochaine facturation"}
-                  value={nextBillingDate}
-                  onChangeText={setNextBillingDate}
-                  placeholder="25/03/2026"
-                />
-                <Field
-                  label="Rappel (jours avant)"
-                  value={reminderDaysBefore}
-                  onChangeText={setReminderDaysBefore}
-                  keyboardType="decimal-pad"
-                  placeholder="3"
-                />
-                <View style={styles.field}>
-                  <Text style={styles.label}>Services inclus</Text>
-                  <Text style={styles.fieldHint}>
-                    {hasUnlimitedIncludedServices
-                      ? `Associe ici autant de services que tu veux. Exemple : NordVPN ou Uber Eats inclus dans Revolut.`
-                      : `Associe jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus sur le plan gratuit. Exemple : NordVPN ou Uber Eats inclus dans Revolut.`}
-                  </Text>
-                  <Text style={styles.fieldHint}>
-                    {hasUnlimitedIncludedServices
-                      ? `${includedProviderNames.length} service(s) inclus selectionne(s) - illimite avec Premium.`
-                      : `${includedProviderNames.length}/${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} service(s) inclus selectionne(s) sur ton plan gratuit.`}
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    value={includedServiceQuery}
-                    onChangeText={setIncludedServiceQuery}
-                    placeholder="Rechercher un service inclus"
-                    placeholderTextColor={theme.colors.textSecondary}
-                  />
-                  {includedProviderNames.length > 0 ? (
-                    <View style={styles.includedChipWrap}>
-                      {includedProviderNames.map((includedProviderName) => (
-                        <Pressable
-                          key={includedProviderName}
-                          onPress={() => removeIncludedProvider(includedProviderName)}
-                          style={styles.includedChip}
-                        >
-                          <ServiceLogo providerName={includedProviderName} size={28} />
-                          <Text style={styles.includedChipLabel}>{includedProviderName}</Text>
-                          <Text style={styles.includedChipRemove}>X</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : (
-                    <View style={styles.emptyIncludedState}>
-                      <Text style={styles.emptyIncludedStateText}>
-                        Aucun service inclus associe pour le moment.
+                {composerStep === "billing" ? (
+                  <>
+                    <View style={styles.stepInfoCard}>
+                      <Text style={styles.stepInfoTitle}>Etape 2</Text>
+                      <Text style={styles.stepInfoBody}>
+                        Definis le prix, la frequence, la date cle et le rappel de paiement.
                       </Text>
                     </View>
-                  )}
-                  {includedServiceSuggestions.length > 0 ? (
-                    <View style={styles.includedSuggestionStack}>
-                      {includedServiceSuggestions.map((suggestion) => (
-                        <Pressable
-                          key={suggestion}
-                          onPress={() => addIncludedProvider(suggestion)}
-                          style={styles.includedSuggestionCard}
-                        >
-                          <View style={styles.includedSuggestionIdentity}>
-                            <ServiceLogo providerName={suggestion} size={36} />
-                            <Text style={styles.includedSuggestionLabel}>{suggestion}</Text>
-                          </View>
-                          <Text style={styles.includedSuggestionAction}>Ajouter</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ) : includedServiceQuery.trim() ? (
-                    <Text style={styles.fieldHint}>
-                      Aucun service du catalogue ne correspond a cette recherche.
-                    </Text>
-                  ) : null}
-                </View>
-                <Field
-                  label="Notes"
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Ex: formule duo, usage perso, engagement annuel"
-                  multiline
-                />
 
-                <PrimaryButton
-                  title={isSaving ? "Enregistrement..." : "Enregistrer l'abonnement"}
-                  onPress={() => void handleSave()}
-                  disabled={isSaving}
-                />
+                    <View style={styles.stepSummaryGrid}>
+                      <View style={styles.stepSummaryGridCard}>
+                        <Text style={styles.stepSummaryLabel}>Service</Text>
+                        <Text style={styles.stepSummaryValue}>{providerName || "A definir"}</Text>
+                      </View>
+                      <View style={styles.stepSummaryGridCard}>
+                        <Text style={styles.stepSummaryLabel}>Rappel conseille</Text>
+                        <Text style={styles.stepSummaryValue}>
+                          {formatReminderDays(Number(accountDefaultReminderDays))}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={[styles.duoRow, isCompact ? styles.duoRowCompact : null]}>
+                      <Field
+                        label="Prix"
+                        value={price}
+                        onChangeText={setPrice}
+                        keyboardType="decimal-pad"
+                        placeholder="8,99"
+                        inputRef={priceInputRef}
+                      />
+                      <View style={styles.field}>
+                        <Text style={styles.label}>Categorie</Text>
+                        <View style={styles.lockedInput}>
+                          <Text style={styles.lockedInputValue}>{category}</Text>
+                          <Text style={styles.lockedInputHint}>Choisie a l'etape precedente</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                ) : null}
+
+                {composerStep === "billing" ? (
+                  <>
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Frequence</Text>
+                      <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
+                        {FREQUENCY_OPTIONS.map((option) => (
+                          <Pressable
+                            key={option.value}
+                            onPress={() => {
+                              setFrequency(option.value);
+                              if (!isEditing) {
+                                setNextBillingDate(getSuggestedDate(option.value));
+                              }
+                            }}
+                            style={[
+                              styles.frequencyChip,
+                              isCompact ? styles.frequencyChipCompact : null,
+                              frequency === option.value ? styles.frequencyChipActive : null
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.frequencyLabel,
+                                frequency === option.value ? styles.frequencyLabelActive : null
+                              ]}
+                            >
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Essai gratuit</Text>
+                      <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
+                        {TRIAL_OPTIONS.map((option) => {
+                          const isActive =
+                            (hasFreeTrial && option.value === "active") ||
+                            (!hasFreeTrial && option.value === "inactive");
+
+                          return (
+                            <Pressable
+                              key={option.value}
+                              onPress={() => {
+                                const nextHasFreeTrial = option.value === "active";
+                                setHasFreeTrial(nextHasFreeTrial);
+
+                                if (nextHasFreeTrial && !trialEndsAt.trim()) {
+                                  setTrialEndsAt(nextBillingDate);
+                                }
+
+                                if (!nextHasFreeTrial) {
+                                  setTrialEndsAt("");
+                                }
+                              }}
+                              style={[
+                                styles.frequencyChip,
+                                isCompact ? styles.frequencyChipCompact : null,
+                                isActive ? styles.frequencyChipActive : null
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.frequencyLabel,
+                                  isActive ? styles.frequencyLabelActive : null
+                                ]}
+                              >
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <Text style={styles.fieldHint}>
+                        Active cette option si l'abonnement commence par une periode d'essai sans
+                        paiement.
+                      </Text>
+                    </View>
+
+                    {hasFreeTrial ? (
+                      <DateField
+                        label="Fin de l'essai gratuit"
+                        value={trialEndsAt}
+                        onChangeText={setTrialEndsAt}
+                        placeholder="25/03/2026"
+                      />
+                    ) : null}
+
+                    <DateField
+                      label={hasFreeTrial ? "Premier paiement apres essai" : "Prochaine facturation"}
+                      value={nextBillingDate}
+                      onChangeText={setNextBillingDate}
+                      placeholder="25/03/2026"
+                    />
+                    {isPremium ? (
+                      <>
+                        <Field
+                          label="Rappel (jours avant)"
+                          value={reminderDaysBefore}
+                          onChangeText={setReminderDaysBefore}
+                          keyboardType="decimal-pad"
+                          placeholder={accountDefaultReminderDays}
+                        />
+
+                        <View style={styles.inlineOptionRow}>
+                          {[0, 1, 3, 7, 14].map((value) => {
+                            const isActive = Number(reminderDaysBefore) === value;
+
+                            return (
+                              <Pressable
+                                key={value}
+                                onPress={() => setReminderDaysBefore(String(value))}
+                                style={[
+                                  styles.inlineOptionChip,
+                                  isActive ? styles.inlineOptionChipActive : null
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.inlineOptionLabel,
+                                    isActive ? styles.inlineOptionLabelActive : null
+                                  ]}
+                                >
+                                  {value === 0 ? "Jour J" : `${value}j`}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.field}>
+                          <Text style={styles.label}>Rappel simple</Text>
+                          <View style={styles.lockedInput}>
+                            <Text style={styles.lockedInputValue}>
+                              {formatReminderDays(Number(accountDefaultReminderDays))}
+                            </Text>
+                            <Text style={styles.lockedInputHint}>
+                              Le rappel personnalise par abonnement est reserve au Premium.
+                            </Text>
+                          </View>
+                        </View>
+                        <PromoCard
+                          eyebrow="Premium"
+                          title="Rappels personnalises"
+                          body="Choisis un delai de rappel pour chaque abonnement au lieu d'utiliser le rappel simple du compte."
+                          ctaLabel="Voir le Premium"
+                          onPress={() => navigation.navigate("Profile")}
+                          tone="purple"
+                        />
+                      </>
+                    )}
+                  </>
+                ) : null}
+                {composerStep === "options" ? (
+                  <>
+                    <View style={styles.stepInfoCard}>
+                      <Text style={styles.stepInfoTitle}>Etape 3</Text>
+                      <Text style={styles.stepInfoBody}>
+                        Termine avec les services inclus et les notes qui aideront pour le suivi.
+                      </Text>
+                    </View>
+
+                    <View style={styles.stepSummaryGrid}>
+                      <View style={styles.stepSummaryGridCard}>
+                        <Text style={styles.stepSummaryLabel}>Montant</Text>
+                        <Text style={styles.stepSummaryValue}>
+                          {price.trim() ? `${price} ${profile?.currency ?? "EUR"}` : "A definir"}
+                        </Text>
+                      </View>
+                      <View style={styles.stepSummaryGridCard}>
+                        <Text style={styles.stepSummaryLabel}>Frequence</Text>
+                        <Text style={styles.stepSummaryValue}>
+                          {FREQUENCY_OPTIONS.find((option) => option.value === frequency)?.label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Services inclus</Text>
+                      <Text style={styles.fieldHint}>
+                        {hasUnlimitedIncludedServices
+                          ? "Associe ici autant de services que tu veux. Exemple : NordVPN ou Uber Eats inclus dans Revolut."
+                          : `Associe jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus sur le plan gratuit. Exemple : NordVPN ou Uber Eats inclus dans Revolut.`}
+                      </Text>
+                      <Text style={styles.fieldHint}>
+                        {hasUnlimitedIncludedServices
+                          ? `${includedProviderNames.length} service(s) inclus selectionne(s) - illimite avec Premium.`
+                          : `${includedProviderNames.length}/${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} service(s) inclus selectionne(s) sur ton plan gratuit.`}
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        value={includedServiceQuery}
+                        onChangeText={setIncludedServiceQuery}
+                        placeholder="Rechercher un service inclus"
+                        placeholderTextColor={theme.colors.textSecondary}
+                      />
+                      {includedProviderNames.length > 0 ? (
+                        <View style={styles.includedChipWrap}>
+                          {includedProviderNames.map((includedProviderName) => (
+                            <Pressable
+                              key={includedProviderName}
+                              onPress={() => removeIncludedProvider(includedProviderName)}
+                              style={styles.includedChip}
+                            >
+                              <ServiceLogo providerName={includedProviderName} size={28} />
+                              <Text style={styles.includedChipLabel}>{includedProviderName}</Text>
+                              <Text style={styles.includedChipRemove}>X</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : (
+                        <View style={styles.emptyIncludedState}>
+                          <Text style={styles.emptyIncludedStateText}>
+                            Aucun service inclus associe pour le moment.
+                          </Text>
+                        </View>
+                      )}
+                      {includedServiceSuggestions.length > 0 ? (
+                        <View style={styles.includedSuggestionStack}>
+                          {includedServiceSuggestions.map((suggestion) => (
+                            <Pressable
+                              key={suggestion}
+                              onPress={() => addIncludedProvider(suggestion)}
+                              style={styles.includedSuggestionCard}
+                            >
+                              <View style={styles.includedSuggestionIdentity}>
+                                <ServiceLogo providerName={suggestion} size={36} />
+                                <Text style={styles.includedSuggestionLabel}>{suggestion}</Text>
+                              </View>
+                              <Text style={styles.includedSuggestionAction}>Ajouter</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : includedServiceQuery.trim() ? (
+                        <Text style={styles.fieldHint}>
+                          Aucun service du catalogue ne correspond a cette recherche.
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    <Field
+                      label="Notes"
+                      value={notes}
+                      onChangeText={setNotes}
+                      placeholder="Ex: formule duo, usage perso, engagement annuel"
+                      multiline
+                    />
+                  </>
+                ) : null}
+
+                <View style={[styles.stepActions, isCompact ? styles.stepActionsCompact : null]}>
+                  {composerStep !== "service" ? (
+                    <View style={styles.stepActionButton}>
+                      <PrimaryButton
+                        title="Retour"
+                        onPress={() =>
+                          setComposerStep((current) =>
+                            current === "options" ? "billing" : "service"
+                          )
+                        }
+                        variant="secondary"
+                      />
+                    </View>
+                  ) : null}
+                  <View style={styles.stepActionButton}>
+                    <PrimaryButton
+                      title={
+                        composerStep === "options"
+                          ? isSaving
+                            ? "Enregistrement..."
+                            : "Enregistrer l'abonnement"
+                          : "Continuer"
+                      }
+                      onPress={() =>
+                        composerStep === "options"
+                          ? void handleSave()
+                          : handleNextComposerStep()
+                      }
+                      disabled={isSaving}
+                    />
+                  </View>
+                </View>
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
@@ -1020,6 +1374,7 @@ type FieldProps = {
   keyboardType?: "default" | "decimal-pad";
   placeholder?: string;
   multiline?: boolean;
+  inputRef?: Ref<TextInput>;
 };
 
 function Field({
@@ -1028,7 +1383,8 @@ function Field({
   onChangeText,
   keyboardType = "default",
   placeholder,
-  multiline = false
+  multiline = false,
+  inputRef
 }: FieldProps): JSX.Element {
   const theme = useAppTheme();
   const styles = createStyles(theme);
@@ -1037,6 +1393,7 @@ function Field({
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={[styles.input, multiline ? styles.inputMultiline : null]}
         value={value}
         onChangeText={onChangeText}
@@ -1323,6 +1680,25 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 19,
     color: theme.colors.textSecondary
   },
+  scrollTopButton: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: spacing.xl,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    ...shadows.card
+  },
+  scrollTopButtonLabel: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: theme.colors.textPrimary
+  },
   modalRoot: {
     flex: 1,
     justifyContent: "flex-end"
@@ -1332,10 +1708,11 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: "rgba(2, 2, 5, 0.72)"
   },
   sheetWrap: {
+    flex: 1,
     justifyContent: "flex-end"
   },
   sheet: {
-    maxHeight: "88%",
+    maxHeight: "94%",
     backgroundColor: "#0F1016",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -1419,10 +1796,103 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 19,
     color: theme.colors.textSecondary
   },
+  stepperRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  stepperChip: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    gap: 2,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  stepperChipActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceContrast
+  },
+  stepperChipCompleted: {
+    borderColor: "rgba(69, 212, 139, 0.35)"
+  },
+  stepperEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    color: theme.colors.textTertiary
+  },
+  stepperEyebrowActive: {
+    color: theme.colors.primary
+  },
+  stepperLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.textSecondary
+  },
+  stepperLabelActive: {
+    color: theme.colors.textPrimary
+  },
   sheetContent: {
     paddingTop: spacing.lg,
     gap: spacing.md,
     paddingBottom: spacing.xl
+  },
+  stepInfoCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  stepInfoTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: theme.colors.primary
+  },
+  stepInfoBody: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.colors.textSecondary
+  },
+  stepSummaryCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: theme.colors.surfaceContrast,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    gap: 4
+  },
+  stepSummaryGrid: {
+    flexDirection: "row",
+    gap: spacing.md
+  },
+  stepSummaryGridCard: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  stepSummaryLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    color: theme.colors.textTertiary
+  },
+  stepSummaryValue: {
+    marginTop: 4,
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.colors.textPrimary
   },
   field: {
     flex: 1,
@@ -1678,6 +2148,34 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   frequencyRowCompact: {
     flexWrap: "wrap"
   },
+  inlineOptionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  inlineOptionChip: {
+    minWidth: 68,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  inlineOptionChipActive: {
+    backgroundColor: theme.colors.surfaceContrast,
+    borderColor: theme.colors.primary
+  },
+  inlineOptionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.colors.textSecondary
+  },
+  inlineOptionLabelActive: {
+    color: theme.colors.primary
+  },
   frequencyChip: {
     flex: 1,
     minHeight: 44,
@@ -1702,5 +2200,16 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   },
   frequencyLabelActive: {
     color: theme.colors.primary
+  },
+  stepActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    paddingTop: spacing.sm
+  },
+  stepActionsCompact: {
+    flexDirection: "column"
+  },
+  stepActionButton: {
+    flex: 1
   }
 });

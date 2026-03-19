@@ -8,6 +8,7 @@ export type RootStackParamList = {
   BubbleGallery: undefined;
   Subscriptions: undefined;
   SubscriptionDetails: { subscriptionId: string };
+  StatisticsCalendar: undefined;
   Profile: undefined;
   Settings: undefined;
   LegalDocument: { documentId: LegalDocumentId };
