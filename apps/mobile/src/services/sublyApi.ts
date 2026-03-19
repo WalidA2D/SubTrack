@@ -20,6 +20,8 @@ export type DashboardSummary = {
   insights: Array<{
     type: string;
     message: string;
+    providerName?: string;
+    count?: number;
   }>;
 };
 

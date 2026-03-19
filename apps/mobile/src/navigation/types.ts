@@ -7,8 +7,10 @@ export type RootStackParamList = {
   AddSubscription: { subscriptionId?: string } | undefined;
   BubbleGallery: undefined;
   Subscriptions: undefined;
+  SubscriptionPdfExport: undefined;
   SubscriptionDetails: { subscriptionId: string };
   StatisticsCalendar: undefined;
+  NotificationCenter: undefined;
   Profile: undefined;
   Settings: undefined;
   LegalDocument: { documentId: LegalDocumentId };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Easing,
   Pressable,
@@ -13,7 +14,7 @@ import {
   Subscription
 } from "@subly/shared";
 
-import { BrandLogo } from "../../components/BrandLogo";
+import { HeaderActionButton } from "../../components/HeaderActionButton";
 import { MickeyBubble } from "../../components/MickeyBubble";
 import { PromoCard } from "../../components/PromoCard";
 import {
@@ -32,6 +33,7 @@ import {
 } from "../../utils/subscriptionLinks";
 import {
   formatCurrency,
+  formatInsightMessage,
   formatInsightTitle,
   formatShortDate
 } from "../../utils/format";
@@ -66,7 +68,8 @@ export function DashboardScreen(): JSX.Element {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const navigation = useAppNavigation();
-  const { t } = useAppTranslation();
+  const { locale, t } = useAppTranslation();
+  const isFrench = locale === "fr";
   const dashboard = useWorkspaceStore((state) => state.dashboard);
   const profile = useWorkspaceStore((state) => state.profile);
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
@@ -108,6 +111,60 @@ export function DashboardScreen(): JSX.Element {
     ? insights
     : insights.filter((insight) => insight.type === "payment_due");
   const hiddenInsightCount = Math.max(insights.length - visibleInsights.length, 0);
+  const copy = {
+    premiumTitle: isFrench ? "Disponible avec Premium" : "Available with Premium",
+    later: isFrench ? "Plus tard" : "Later",
+    viewPremium: isFrench ? "Voir Premium" : "See Premium",
+    calendarPremiumBody: isFrench
+      ? "Le calendrier des prelevements fait partie des avantages Premium."
+      : "The billing calendar is part of Premium benefits.",
+    freePlanEyebrow: isFrench ? "Plan gratuit" : "Free plan",
+    sponsoredTitle: isFrench ? "Espace sponsorise" : "Sponsored space",
+    sponsoredBody: isFrench
+      ? "Le plan gratuit affiche des cartes sponsorisees dans l'app. Le Premium retire ces emplacements et ouvre les statistiques avancees."
+      : "The free plan shows sponsored cards in the app. Premium removes them and unlocks advanced statistics.",
+    goPremium: isFrench ? "Passer au Premium" : "Go Premium",
+    addFirstSubscription: isFrench
+      ? "Ajouter mon premier abonnement"
+      : "Add my first subscription",
+    compareDuplicates: isFrench ? "Comparer mes doublons" : "Compare my duplicates",
+    checkUsage: isFrench ? "Verifier mes usages" : "Check my usage",
+    openDetailedView: isFrench ? "Ouvrir la vue detaillee" : "Open detailed view",
+    premiumEyebrow: isFrench ? "Premium" : "Premium",
+    hiddenInsightsTitle: isFrench
+      ? "Detection peu utile et doublons"
+      : "Low-usage and duplicate detection",
+    hiddenInsightsBody: hiddenInsightCount > 0
+      ? isFrench
+        ? `${hiddenInsightCount} alerte(s) intelligente(s) restent reservees au Premium pour t'aider a reperer les services peu utiles et les doublons.`
+        : `${hiddenInsightCount} smart alert(s) are still reserved for Premium to help you spot low-value services and duplicates.`
+      : isFrench
+        ? "Passe au Premium pour debloquer les alertes intelligentes sur les doublons et les abonnements peu utiles."
+        : "Upgrade to Premium to unlock smart alerts for duplicates and low-usage subscriptions.",
+    viewBenefits: isFrench ? "Voir les avantages" : "See benefits"
+  };
+
+  const handleOpenCalendar = () => {
+    if (isPremium) {
+      navigation.navigate("StatisticsCalendar");
+      return;
+    }
+
+    Alert.alert(
+      copy.premiumTitle,
+      copy.calendarPremiumBody,
+      [
+        {
+          text: copy.later,
+          style: "cancel"
+        },
+        {
+          text: copy.viewPremium,
+          onPress: () => navigation.navigate("Profile")
+        }
+      ]
+    );
+  };
 
   const handleArchiveSubscription = async (subscriptionId: string) => {
     if (archivingSubscriptionId) {
@@ -140,10 +197,14 @@ export function DashboardScreen(): JSX.Element {
         contentContainerStyle={styles.content}
       >
         <View style={[styles.topBar, isCompact ? styles.topBarCompact : null]}>
-          <BrandLogo compact={isCompact} />
           <View style={styles.actionRow}>
-            <IconActionButton kind="profile" onPress={() => navigation.navigate("Profile")} />
-            <IconActionButton kind="settings" onPress={() => navigation.navigate("Settings")} />
+            <HeaderActionButton
+              kind="notifications"
+              onPress={() => navigation.navigate("NotificationCenter")}
+            />
+            <HeaderActionButton kind="calendar" onPress={handleOpenCalendar} />
+            <HeaderActionButton kind="profile" onPress={() => navigation.navigate("Profile")} />
+            <HeaderActionButton kind="settings" onPress={() => navigation.navigate("Settings")} />
           </View>
         </View>
 
@@ -188,10 +249,10 @@ export function DashboardScreen(): JSX.Element {
 
         {!isPremium ? (
           <PromoCard
-            eyebrow="Plan gratuit"
-            title="Espace sponsorise"
-            body="Le plan gratuit affiche des cartes sponsorisees dans l'app. Le Premium retire ces emplacements et ouvre les statistiques avancees."
-            ctaLabel="Passer au Premium"
+            eyebrow={copy.freePlanEyebrow}
+            title={copy.sponsoredTitle}
+            body={copy.sponsoredBody}
+            ctaLabel={copy.goPremium}
             onPress={() => navigation.navigate("Profile")}
           />
         ) : null}
@@ -251,7 +312,7 @@ export function DashboardScreen(): JSX.Element {
                   style={styles.inlineCtaButton}
                   onPress={() => navigation.navigate("AddSubscription")}
                 >
-                  <Text style={styles.inlineCtaButtonLabel}>Ajouter mon premier abonnement</Text>
+                  <Text style={styles.inlineCtaButtonLabel}>{copy.addFirstSubscription}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -343,7 +404,7 @@ export function DashboardScreen(): JSX.Element {
             visibleInsights.map((insight, index) => (
               <View key={`${insight.type}_${index}`} style={styles.insightCard}>
                 <Text style={styles.insightTitle}>{formatInsightTitle(insight.type)}</Text>
-                <Text style={styles.insightBody}>{insight.message}</Text>
+                <Text style={styles.insightBody}>{formatInsightMessage(insight)}</Text>
                 <Pressable
                   style={styles.insightButton}
                   onPress={() =>
@@ -354,10 +415,10 @@ export function DashboardScreen(): JSX.Element {
                 >
                   <Text style={styles.insightButtonLabel}>
                     {insight.type === "duplicate_subscription"
-                      ? "Comparer mes doublons"
+                      ? copy.compareDuplicates
                       : insight.type === "unused_subscription"
-                        ? "Verifier mes usages"
-                        : "Ouvrir la vue detaillee"}
+                        ? copy.checkUsage
+                        : copy.openDetailedView}
                   </Text>
                 </Pressable>
               </View>
@@ -365,62 +426,16 @@ export function DashboardScreen(): JSX.Element {
           )}
           {!isPremium ? (
             <PromoCard
-              eyebrow="Premium"
-              title="Detection peu utile et doublons"
-              body={
-                hiddenInsightCount > 0
-                  ? `${hiddenInsightCount} alerte(s) intelligente(s) restent reservees au Premium pour t'aider a reperer les services peu utiles et les doublons.`
-                  : "Passe au Premium pour debloquer les alertes intelligentes sur les doublons et les abonnements peu utiles."
-              }
-              ctaLabel="Voir les avantages"
+              eyebrow={copy.premiumEyebrow}
+              title={copy.hiddenInsightsTitle}
+              body={copy.hiddenInsightsBody}
+              ctaLabel={copy.viewBenefits}
               onPress={() => navigation.navigate("Profile")}
               tone="purple"
             />
           ) : null}
         </View>
       </ScrollView>
-    </View>
-  );
-}
-
-function IconActionButton({
-  kind,
-  onPress
-}: {
-  kind: "profile" | "settings";
-  onPress: () => void;
-}): JSX.Element {
-  const styles = createStyles(useAppTheme());
-
-  return (
-    <Pressable style={styles.iconAction} onPress={onPress}>
-      {kind === "profile" ? <ProfileGlyph /> : <SettingsGlyph />}
-    </Pressable>
-  );
-}
-
-function ProfileGlyph(): JSX.Element {
-  const styles = createStyles(useAppTheme());
-
-  return (
-    <View style={styles.profileGlyph}>
-      <View style={styles.profileGlyphHead} />
-      <View style={styles.profileGlyphBody} />
-    </View>
-  );
-}
-
-function SettingsGlyph(): JSX.Element {
-  const styles = createStyles(useAppTheme());
-
-  return (
-    <View style={styles.settingsGlyph}>
-      <View style={styles.settingsGlyphRing} />
-      <View style={styles.settingsGlyphCenter} />
-      <View style={[styles.settingsGlyphTick, styles.settingsGlyphTickTop]} />
-      <View style={[styles.settingsGlyphTick, styles.settingsGlyphTickBottom]} />
-      <View style={[styles.settingsGlyphTick, styles.settingsGlyphTickLeft]} />
-      <View style={[styles.settingsGlyphTick, styles.settingsGlyphTickRight]} />
     </View>
   );
 }
@@ -1811,87 +1826,17 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     gap: spacing.md
   },
   topBarCompact: {
     flexWrap: "wrap",
-    justifyContent: "space-between"
+    justifyContent: "flex-end"
   },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
-  },
-  iconAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: theme.colors.border
-  },
-  profileGlyph: {
-    width: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2
-  },
-  profileGlyphHead: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: theme.colors.textPrimary
-  },
-  profileGlyphBody: {
-    width: 14,
-    height: 7,
-    borderTopLeftRadius: 7,
-    borderTopRightRadius: 7,
-    backgroundColor: theme.colors.textPrimary
-  },
-  settingsGlyph: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  settingsGlyphRing: {
-    position: "absolute",
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1.6,
-    borderColor: theme.colors.textPrimary
-  },
-  settingsGlyphCenter: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: theme.colors.textPrimary
-  },
-  settingsGlyphTick: {
-    position: "absolute",
-    width: 2,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.textPrimary
-  },
-  settingsGlyphTickTop: {
-    top: 0
-  },
-  settingsGlyphTickBottom: {
-    bottom: 0
-  },
-  settingsGlyphTickLeft: {
-    left: 0,
-    transform: [{ rotate: "90deg" }]
-  },
-  settingsGlyphTickRight: {
-    right: 0,
-    transform: [{ rotate: "90deg" }]
   },
   summaryCard: {
     flexDirection: "row",

@@ -16,6 +16,7 @@ export const usageCheckInSchema = z.enum(["active", "unused", "uncertain"]);
 export const subscriptionLogoModeSchema = z.enum(["option", "base"]);
 
 export const notificationPreferencesSchema = z.object({
+  notificationsEnabled: z.boolean(),
   paymentReminders: z.boolean(),
   trialReminders: z.boolean(),
   insightNotifications: z.boolean(),

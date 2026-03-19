@@ -121,6 +121,7 @@ async function applyProfileOverrides(user) {
       planTier: user.profile.planTier,
       currency: user.profile.currency,
       notificationPreferences: {
+        notificationsEnabled: true,
         paymentReminders: true,
         trialReminders: true,
         insightNotifications: true,

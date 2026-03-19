@@ -8,6 +8,7 @@ import {
 } from "../../constants/legalDocuments";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
+import { useAppTranslation } from "../../i18n";
 import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
 
@@ -15,6 +16,8 @@ export function LegalDocumentScreen(): JSX.Element {
   const navigation = useAppNavigation();
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const route = useCurrentOverlayRoute();
   const documentId =
     route?.name === "LegalDocument" ? route.params.documentId : LEGAL_DOCUMENT_ORDER[0];
@@ -35,32 +38,41 @@ export function LegalDocumentScreen(): JSX.Element {
   const toggleFaqItem = (itemKey: string) => {
     setExpandedFaqItem((currentItem) => (currentItem === itemKey ? null : itemKey));
   };
+  const copy = {
+    back: isFrench ? "Retour" : "Back",
+    helpCenter: isFrench ? "Centre d'aide" : "Help center",
+    faqTitle: isFrench ? "Une FAQ plus simple a parcourir" : "An easier FAQ to browse",
+    faqBody: isFrench
+      ? "Ouvre une question pour afficher la reponse utile sans devoir lire tout le document d'un bloc."
+      : "Open a question to show the useful answer without reading the whole document in one block.",
+    keyThemes: isFrench ? "themes cles" : "key themes",
+    quickAnswers: isFrench ? "reponses rapides" : "quick answers",
+    questionSingular: isFrench ? "question" : "question",
+    questionPlural: isFrench ? "questions" : "questions"
+  };
 
   return (
     <Screen
       title={document.title}
       subtitle={document.subtitle}
-      action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
+      action={<PrimaryButton title={copy.back} onPress={navigation.goBack} variant="secondary" />}
     >
       {document.id === "faq" ? (
         <View style={styles.faqLayout}>
           <View style={styles.faqHeroCard}>
             <View pointerEvents="none" style={styles.faqHeroGlowOrange} />
             <View pointerEvents="none" style={styles.faqHeroGlowPurple} />
-            <Text style={styles.faqEyebrow}>Centre d'aide</Text>
-            <Text style={styles.faqHeroTitle}>Une FAQ plus simple a parcourir</Text>
-            <Text style={styles.faqHeroDescription}>
-              Ouvre une question pour afficher la reponse utile sans devoir lire tout le
-              document d'un bloc.
-            </Text>
+            <Text style={styles.faqEyebrow}>{copy.helpCenter}</Text>
+            <Text style={styles.faqHeroTitle}>{copy.faqTitle}</Text>
+            <Text style={styles.faqHeroDescription}>{copy.faqBody}</Text>
             <View style={styles.faqStatsRow}>
               <View style={styles.faqStatCard}>
                 <Text style={styles.faqStatValue}>{document.sections.length}</Text>
-                <Text style={styles.faqStatLabel}>themes cles</Text>
+                <Text style={styles.faqStatLabel}>{copy.keyThemes}</Text>
               </View>
               <View style={styles.faqStatCard}>
                 <Text style={styles.faqStatValue}>{faqQuestionCount}</Text>
-                <Text style={styles.faqStatLabel}>reponses rapides</Text>
+                <Text style={styles.faqStatLabel}>{copy.quickAnswers}</Text>
               </View>
             </View>
           </View>
@@ -79,7 +91,9 @@ export function LegalDocumentScreen(): JSX.Element {
                   ) : null}
                   <Text style={styles.faqSectionMeta}>
                     {section.faqItems?.length ?? 0}{" "}
-                    {section.faqItems?.length === 1 ? "question" : "questions"}
+                    {section.faqItems?.length === 1
+                      ? copy.questionSingular
+                      : copy.questionPlural}
                   </Text>
                 </View>
               </View>

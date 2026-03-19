@@ -17,6 +17,12 @@ import {
   ALL_CURRENCY_OPTIONS,
 } from "../../constants/currencies";
 import {
+  APP_LANGUAGE_OPTIONS,
+  getAppLanguageLabel,
+  getAppLanguageValue,
+  normalizeAppLanguageSearch
+} from "../../constants/appLanguages";
+import {
   getLegalDocument,
   LEGAL_DOCUMENT_ORDER,
   type LegalDocumentId
@@ -44,8 +50,9 @@ export function SettingsScreen(): JSX.Element {
   const isCompact = width < 390;
   const navigation = useAppNavigation();
   const theme = useAppTheme();
-  const { t } = useAppTranslation();
+  const { locale, t } = useAppTranslation();
   const styles = createStyles(theme);
+  const isFrench = locale === "fr";
   const profile = useWorkspaceStore((state) => state.profile);
   const isUpdatingSettings = useWorkspaceStore((state) => state.isUpdatingSettings);
   const updateSettings = useWorkspaceStore((state) => state.updateSettings);
@@ -57,21 +64,103 @@ export function SettingsScreen(): JSX.Element {
   const [nextPassword, setNextPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [currencyQuery, setCurrencyQuery] = useState("");
+  const [languageQuery, setLanguageQuery] = useState("");
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const currentCurrency = profile?.currency ?? "EUR";
+  const notificationsEnabled = preferences?.notificationsEnabled ?? true;
+  const currentLanguage = getAppLanguageValue(profile?.language);
   const activeCurrencyOption =
     ALL_CURRENCY_OPTIONS.find((option) => option.code === currentCurrency) ?? null;
+  const activeLanguageLabel = getAppLanguageLabel(profile?.language);
+  const copy = {
+    premiumTitle: isFrench ? "Disponible avec Premium" : "Available with Premium",
+    later: isFrench ? "Plus tard" : "Later",
+    viewPremium: isFrench ? "Voir Premium" : "See Premium",
+    preferencesTitle: isFrench ? "Preferences" : "Preferences",
+    preferencesBody: isFrench
+      ? "Reglages utiles au fonctionnement quotidien de l'application."
+      : "Useful settings for the app's day-to-day behavior.",
+    defaultReminder: isFrench ? "Rappel par defaut" : "Default reminder",
+    premiumReminderBody: isFrench
+      ? "Ce delai est pre-rempli quand tu ajoutes un nouvel abonnement, puis reste modifiable fiche par fiche."
+      : "This delay is prefilled when you add a new subscription, then stays editable per subscription.",
+    freeReminderBody: isFrench
+      ? "Le plan gratuit utilise des rappels simples. Passe au Premium pour personnaliser le delai au niveau du compte et de chaque abonnement."
+      : "The free plan uses simple reminders. Upgrade to Premium to customize the delay at account and subscription level.",
+    dayD: isFrench ? "Jour J" : "Same day",
+    premiumEyebrow: "Premium",
+    premiumReminderTitle: isFrench ? "Rappels personnalises" : "Custom reminders",
+    premiumReminderPromoBody: isFrench
+      ? "Choisis un delai de rappel par defaut pour tout le compte et ajuste ensuite chaque abonnement selon ton rythme."
+      : "Choose a default reminder delay for the whole account and then adjust each subscription to your pace.",
+    currencyChoose: isFrench ? "Choisir une devise" : "Choose a currency",
+    securityTitle: isFrench ? "Securite du compte" : "Account security",
+    securityBody: isFrench
+      ? "Protige l'acces a ton compte, gere ton mot de passe et ferme le compte si besoin."
+      : "Protect account access, manage your password and close the account if needed.",
+    currentPassword: isFrench ? "Mot de passe actuel" : "Current password",
+    newPassword: isFrench ? "Nouveau mot de passe" : "New password",
+    confirmPassword: isFrench
+      ? "Confirmer le nouveau mot de passe"
+      : "Confirm new password",
+    updating: isFrench ? "Mise a jour..." : "Updating...",
+    changePassword: isFrench ? "Changer le mot de passe" : "Change password",
+    incompleteTitle: isFrench ? "Champs incomplets" : "Incomplete fields",
+    incompleteBody: isFrench
+      ? "Renseigne ton mot de passe actuel, le nouveau et la confirmation."
+      : "Enter your current password, the new one and the confirmation.",
+    shortPasswordTitle: isFrench ? "Mot de passe trop court" : "Password too short",
+    shortPasswordBody: isFrench
+      ? "Le nouveau mot de passe doit contenir au moins 8 caracteres."
+      : "The new password must contain at least 8 characters.",
+    mismatchTitle: isFrench ? "Confirmation differente" : "Different confirmation",
+    mismatchBody: isFrench
+      ? "Le nouveau mot de passe et sa confirmation ne correspondent pas."
+      : "The new password and its confirmation do not match.",
+    passwordUpdatedTitle: isFrench ? "Mot de passe mis a jour" : "Password updated",
+    passwordUpdatedBody: isFrench
+      ? "Ton mot de passe a bien ete change."
+      : "Your password has been updated.",
+    passwordUpdateFailed: isFrench ? "Modification impossible" : "Unable to update",
+    deletingTitle: isFrench ? "Suppression du compte" : "Delete account",
+    deletingBody: isFrench
+      ? `Le compte est desactive immediatement, archive pendant ${ACCOUNT_DELETION_RETENTION_DAYS} jours pour des raisons de securite, puis supprime definitivement avec les donnees reliees.`
+      : `The account is disabled immediately, archived for ${ACCOUNT_DELETION_RETENTION_DAYS} days for security reasons, then permanently deleted with related data.`,
+    deletingProgress: isFrench ? "Suppression..." : "Deleting...",
+    deletingAction: isFrench ? "Supprimer mon compte" : "Delete my account",
+    deletionScheduledTitle: isFrench ? "Suppression programmee" : "Deletion scheduled",
+    deletionScheduledBody: (date: string) =>
+      isFrench
+        ? `Ton compte et toutes les donnees liees sont archives jusqu'au ${date} pour des raisons de securite, puis seront supprimes definitivement.`
+        : `Your account and all related data are archived until ${date} for security reasons, then will be permanently deleted.`,
+    deletionFailedTitle: isFrench ? "Suppression impossible" : "Unable to delete account",
+    confirmDeletionTitle: isFrench ? "Supprimer ton compte ?" : "Delete your account?",
+    confirmDeletionBody: isFrench
+      ? `Ton compte sera desactive tout de suite. Toutes les donnees reliees seront archivees pendant ${ACCOUNT_DELETION_RETENTION_DAYS} jours pour des raisons de securite, puis supprimees definitivement.`
+      : `Your account will be disabled right away. All related data will be archived for ${ACCOUNT_DELETION_RETENTION_DAYS} days for security reasons, then permanently deleted.`,
+    cancel: isFrench ? "Annuler" : "Cancel",
+    legalTitle: isFrench ? "Cadre legal et RGPD" : "Legal and privacy",
+    legalBody: isFrench
+      ? "Ces rubriques regroupent la FAQ, les informations necessaires sur l'editeur, la confidentialite, les droits des personnes, la conservation, la securite et les permissions de l'application."
+      : "These sections gather the FAQ, publisher information, privacy details, data rights, retention, security and app permissions.",
+    accountCurrency: isFrench ? "Devise du compte" : "Account currency",
+    currencySubtitle: isFrench
+      ? "Choisis la devise de reference du compte parmi les devises utilisees dans le monde."
+      : "Choose the account reference currency from currencies used worldwide.",
+    currencySearch: isFrench ? "Rechercher par code ou nom" : "Search by code or name"
+  };
 
   const handleOpenPremium = (feature: string) => {
-    Alert.alert("Disponible avec Premium", `${feature} fait partie des avantages Premium.`, [
+    Alert.alert(copy.premiumTitle, `${feature} ${isFrench ? "fait partie des avantages Premium." : "is part of Premium benefits."}`, [
       {
-        text: "Plus tard",
+        text: copy.later,
         style: "cancel"
       },
       {
-        text: "Voir Premium",
+        text: copy.viewPremium,
         onPress: () => navigation.navigate("Profile")
       }
     ]);
@@ -102,9 +191,25 @@ export function SettingsScreen(): JSX.Element {
       return haystack.includes(normalizedQuery);
     });
   }, [currencyQuery]);
+  const filteredLanguages = useMemo(() => {
+    const normalizedQuery = normalizeAppLanguageSearch(languageQuery);
+
+    return APP_LANGUAGE_OPTIONS.filter((option) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const haystack = normalizeAppLanguageSearch(`${option.label} ${option.value}`);
+      return haystack.includes(normalizedQuery);
+    });
+  }, [languageQuery]);
 
   const handleToggle = async (
-    field: "paymentReminders" | "trialReminders" | "insightNotifications",
+    field:
+      | "notificationsEnabled"
+      | "paymentReminders"
+      | "trialReminders"
+      | "insightNotifications",
     value: boolean
   ) => {
     try {
@@ -134,7 +239,7 @@ export function SettingsScreen(): JSX.Element {
 
   const handleDefaultReminderChange = async (value: number) => {
     if (!isPremium) {
-      handleOpenPremium("Les rappels personnalises");
+      handleOpenPremium(isFrench ? "Les rappels personnalises" : "Custom reminders");
       return;
     }
 
@@ -186,28 +291,37 @@ export function SettingsScreen(): JSX.Element {
     }
   };
 
+  const handleLanguageChange = async (languageValue: string) => {
+    if (languageValue === currentLanguage) {
+      setLanguageModalVisible(false);
+      return;
+    }
+
+    try {
+      await updateSettings({ language: languageValue });
+      setLanguageQuery("");
+      setLanguageModalVisible(false);
+    } catch (error) {
+      Alert.alert(
+        t("settings.updateErrorTitle"),
+        error instanceof Error ? error.message : t("common.retry")
+      );
+    }
+  };
+
   const handleChangePassword = async () => {
     if (!currentPassword.trim() || !nextPassword.trim() || !confirmPassword.trim()) {
-      Alert.alert(
-        "Champs incomplets",
-        "Renseigne ton mot de passe actuel, le nouveau et la confirmation."
-      );
+      Alert.alert(copy.incompleteTitle, copy.incompleteBody);
       return;
     }
 
     if (nextPassword.length < 8) {
-      Alert.alert(
-        "Mot de passe trop court",
-        "Le nouveau mot de passe doit contenir au moins 8 caracteres."
-      );
+      Alert.alert(copy.shortPasswordTitle, copy.shortPasswordBody);
       return;
     }
 
     if (nextPassword !== confirmPassword) {
-      Alert.alert(
-        "Confirmation differente",
-        "Le nouveau mot de passe et sa confirmation ne correspondent pas."
-      );
+      Alert.alert(copy.mismatchTitle, copy.mismatchBody);
       return;
     }
 
@@ -217,14 +331,11 @@ export function SettingsScreen(): JSX.Element {
       setCurrentPassword("");
       setNextPassword("");
       setConfirmPassword("");
-      Alert.alert(
-        "Mot de passe mis a jour",
-        "Ton mot de passe a bien ete change."
-      );
+      Alert.alert(copy.passwordUpdatedTitle, copy.passwordUpdatedBody);
     } catch (error) {
       Alert.alert(
-        "Modification impossible",
-        error instanceof Error ? error.message : "Merci de reessayer."
+        copy.passwordUpdateFailed,
+        error instanceof Error ? error.message : t("common.retry")
       );
     } finally {
       setIsChangingPassword(false);
@@ -235,19 +346,21 @@ export function SettingsScreen(): JSX.Element {
     try {
       setIsDeletingAccount(true);
       const deletion = await sublyApi.requestAccountDeletion();
-      const scheduledDate = new Date(deletion.deletionScheduledFor).toLocaleDateString("fr-FR");
+      const scheduledDate = new Date(deletion.deletionScheduledFor).toLocaleDateString(
+        isFrench ? "fr-FR" : "en-US"
+      );
 
       await authService.signOut();
       resetWorkspace();
 
       Alert.alert(
-        "Suppression programmee",
-        `Ton compte et toutes les donnees liees sont archives jusqu'au ${scheduledDate} pour des raisons de securite, puis seront supprimes definitivement.`
+        copy.deletionScheduledTitle,
+        copy.deletionScheduledBody(scheduledDate)
       );
     } catch (error) {
       Alert.alert(
-        "Suppression impossible",
-        error instanceof Error ? error.message : "Merci de reessayer."
+        copy.deletionFailedTitle,
+        error instanceof Error ? error.message : t("common.retry")
       );
     } finally {
       setIsDeletingAccount(false);
@@ -256,15 +369,15 @@ export function SettingsScreen(): JSX.Element {
 
   const handleRequestAccountDeletion = () => {
     Alert.alert(
-      "Supprimer ton compte ?",
-      `Ton compte sera desactive tout de suite. Toutes les donnees reliees seront archivees pendant ${ACCOUNT_DELETION_RETENTION_DAYS} jours pour des raisons de securite, puis supprimees definitivement.`,
+      copy.confirmDeletionTitle,
+      copy.confirmDeletionBody,
       [
         {
-          text: "Annuler",
+          text: copy.cancel,
           style: "cancel"
         },
         {
-          text: "Supprimer mon compte",
+          text: copy.deletingAction,
           style: "destructive",
           onPress: () => {
             void runAccountDeletion();
@@ -277,40 +390,52 @@ export function SettingsScreen(): JSX.Element {
   return (
     <Screen
       title={t("settings.title")}
-      subtitle="Centralise ici les preferences, la securite du compte et toutes les informations legales utiles a la conformite RGPD."
+      subtitle={t("settings.subtitle")}
       action={<PrimaryButton title={t("common.back")} onPress={navigation.goBack} variant="secondary" />}
     >
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <Text style={styles.helper}>
-          Reglages utiles au fonctionnement quotidien de l'application.
-        </Text>
+        <Text style={styles.sectionTitle}>{copy.preferencesTitle}</Text>
+        <Text style={styles.helper}>{copy.preferencesBody}</Text>
+        <LegalLinkRow
+          title={t("settings.notificationCenter")}
+          description={t("settings.notificationCenterBody")}
+          onPress={() => navigation.navigate("NotificationCenter")}
+          styles={styles}
+        />
+        <SettingsRow
+          label={t("settings.notificationsEnabled")}
+          value={notificationsEnabled}
+          onValueChange={(value) => void handleToggle("notificationsEnabled", value)}
+          disabled={isUpdatingSettings || isDeletingAccount}
+          styles={styles}
+          theme={theme}
+        />
         <SettingsRow
           label={t("settings.paymentReminders")}
-          value={preferences?.paymentReminders ?? true}
+          value={notificationsEnabled ? preferences?.paymentReminders ?? true : false}
           onValueChange={(value) => void handleToggle("paymentReminders", value)}
-          disabled={isUpdatingSettings || isDeletingAccount}
+          disabled={isUpdatingSettings || isDeletingAccount || !notificationsEnabled}
           styles={styles}
           theme={theme}
         />
         <SettingsRow
           label={t("settings.trialReminders")}
-          value={preferences?.trialReminders ?? true}
+          value={notificationsEnabled ? preferences?.trialReminders ?? true : false}
           onValueChange={(value) => void handleToggle("trialReminders", value)}
-          disabled={isUpdatingSettings || isDeletingAccount}
+          disabled={isUpdatingSettings || isDeletingAccount || !notificationsEnabled}
           styles={styles}
           theme={theme}
         />
         <SettingsRow
           label={t("settings.smartNotifications")}
-          value={preferences?.insightNotifications ?? true}
+          value={notificationsEnabled ? preferences?.insightNotifications ?? true : false}
           onValueChange={(value) => void handleToggle("insightNotifications", value)}
-          disabled={isUpdatingSettings || isDeletingAccount}
+          disabled={isUpdatingSettings || isDeletingAccount || !notificationsEnabled}
           styles={styles}
           theme={theme}
         />
         <SettingsRow
-          label="Mode daltonien"
+          label={t("settings.colorBlindMode")}
           value={profile?.colorBlindMode ?? false}
           onValueChange={(value) => void handleColorBlindToggle(value)}
           disabled={isUpdatingSettings || isDeletingAccount}
@@ -319,12 +444,12 @@ export function SettingsScreen(): JSX.Element {
         />
 
         <View style={styles.reminderCard}>
-          <Text style={styles.infoLabel}>Rappel par defaut</Text>
+          <Text style={styles.infoLabel}>{copy.defaultReminder}</Text>
           <Text style={styles.infoValue}>{formatReminderDays(defaultReminderDaysBefore)}</Text>
           <Text style={styles.helper}>
             {isPremium
-              ? "Ce delai est pre-rempli quand tu ajoutes un nouvel abonnement, puis reste modifiable fiche par fiche."
-              : "Le plan gratuit utilise des rappels simples. Passe au Premium pour personnaliser le delai au niveau du compte et de chaque abonnement."}
+              ? copy.premiumReminderBody
+              : copy.freeReminderBody}
           </Text>
           <View style={styles.reminderChipRow}>
             {[0, 1, 3, 5, 7, 14].map((value) => {
@@ -346,7 +471,7 @@ export function SettingsScreen(): JSX.Element {
                       isActive ? styles.reminderChipLabelActive : null
                     ]}
                   >
-                    {value === 0 ? "Jour J" : `${value} j`}
+                    {value === 0 ? copy.dayD : `${value} j`}
                   </Text>
                 </Pressable>
               );
@@ -356,14 +481,29 @@ export function SettingsScreen(): JSX.Element {
 
         {!isPremium ? (
           <PromoCard
-            eyebrow="Premium"
-            title="Rappels personnalises"
-            body="Choisis un delai de rappel par defaut pour tout le compte et ajuste ensuite chaque abonnement selon ton rythme."
-            ctaLabel="Voir le Premium"
+            eyebrow={copy.premiumEyebrow}
+            title={copy.premiumReminderTitle}
+            body={copy.premiumReminderPromoBody}
+            ctaLabel={copy.viewPremium}
             onPress={() => navigation.navigate("Profile")}
             tone="purple"
           />
         ) : null}
+
+        <View style={styles.infoCard}>
+          <Text style={styles.infoLabel}>{t("settings.appLanguage")}</Text>
+          <Pressable
+            onPress={() => setLanguageModalVisible(true)}
+            disabled={isUpdatingSettings || isDeletingAccount}
+            style={styles.currencySelector}
+          >
+            <View style={styles.currencySelectorText}>
+              <Text style={styles.infoValue}>{activeLanguageLabel}</Text>
+              <Text style={styles.currencyHelper}>{t("settings.chooseLanguage")}</Text>
+            </View>
+            <Text style={styles.linkChevron}>{">"}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>{t("settings.activeCurrency")}</Text>
@@ -375,7 +515,7 @@ export function SettingsScreen(): JSX.Element {
             <View style={styles.currencySelectorText}>
               <Text style={styles.infoValue}>{currentCurrency}</Text>
               <Text style={styles.currencyHelper}>
-                {activeCurrencyOption?.name ?? "Choisir une devise"}
+                {activeCurrencyOption?.name ?? copy.currencyChoose}
               </Text>
             </View>
             <Text style={styles.linkChevron}>{">"}</Text>
@@ -384,15 +524,13 @@ export function SettingsScreen(): JSX.Element {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Securite du compte</Text>
-        <Text style={styles.helper}>
-          Protige l'acces a ton compte, gere ton mot de passe et ferme le compte si besoin.
-        </Text>
+        <Text style={styles.sectionTitle}>{copy.securityTitle}</Text>
+        <Text style={styles.helper}>{copy.securityBody}</Text>
         <TextInput
           style={styles.input}
           value={currentPassword}
           onChangeText={setCurrentPassword}
-          placeholder="Mot de passe actuel"
+          placeholder={copy.currentPassword}
           placeholderTextColor={theme.colors.textSecondary}
           secureTextEntry
           autoCapitalize="none"
@@ -401,7 +539,7 @@ export function SettingsScreen(): JSX.Element {
           style={styles.input}
           value={nextPassword}
           onChangeText={setNextPassword}
-          placeholder="Nouveau mot de passe"
+          placeholder={copy.newPassword}
           placeholderTextColor={theme.colors.textSecondary}
           secureTextEntry
           autoCapitalize="none"
@@ -410,26 +548,23 @@ export function SettingsScreen(): JSX.Element {
           style={styles.input}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          placeholder="Confirmer le nouveau mot de passe"
+          placeholder={copy.confirmPassword}
           placeholderTextColor={theme.colors.textSecondary}
           secureTextEntry
           autoCapitalize="none"
         />
         <PrimaryButton
-          title={isChangingPassword ? "Mise a jour..." : "Changer le mot de passe"}
+          title={isChangingPassword ? copy.updating : copy.changePassword}
           onPress={() => void handleChangePassword()}
           disabled={isChangingPassword || isDeletingAccount}
           variant="secondary"
         />
 
         <View style={styles.dangerCard}>
-          <Text style={styles.dangerTitle}>Suppression du compte</Text>
-          <Text style={styles.dangerText}>
-            Le compte est desactive immediatement, archive pendant {ACCOUNT_DELETION_RETENTION_DAYS} jours
-            pour des raisons de securite, puis supprime definitivement avec les donnees reliees.
-          </Text>
+          <Text style={styles.dangerTitle}>{copy.deletingTitle}</Text>
+          <Text style={styles.dangerText}>{copy.deletingBody}</Text>
           <PrimaryButton
-            title={isDeletingAccount ? "Suppression..." : "Supprimer mon compte"}
+            title={isDeletingAccount ? copy.deletingProgress : copy.deletingAction}
             onPress={handleRequestAccountDeletion}
             disabled={isDeletingAccount || isChangingPassword}
             variant="secondary"
@@ -438,10 +573,8 @@ export function SettingsScreen(): JSX.Element {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Cadre legal et RGPD</Text>
-        <Text style={styles.helper}>
-          Ces rubriques regroupent la FAQ, les informations necessaires sur l'editeur, la confidentialite, les droits des personnes, la conservation, la securite et les permissions de l'application.
-        </Text>
+        <Text style={styles.sectionTitle}>{copy.legalTitle}</Text>
+        <Text style={styles.helper}>{copy.legalBody}</Text>
         <View style={styles.linkStack}>
           {legalLinks.map((link) => (
             <LegalLinkRow
@@ -467,6 +600,84 @@ export function SettingsScreen(): JSX.Element {
       />
 
       <Modal
+        visible={isLanguageModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.backdrop} onPress={() => setLanguageModalVisible(false)} />
+          <View style={[styles.sheet, isCompact ? styles.sheetCompact : null]}>
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHeaderText}>
+                <Text style={styles.sheetEyebrow}>{t("settings.languageEyebrow")}</Text>
+                <Text style={styles.sheetTitle}>{activeLanguageLabel}</Text>
+                <Text style={styles.sheetSubtitle}>{t("settings.languageSubtitle")}</Text>
+              </View>
+              <Pressable
+                style={styles.closeButton}
+                onPress={() => setLanguageModalVisible(false)}
+              >
+                <Text style={styles.closeButtonLabel}>X</Text>
+              </Pressable>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              value={languageQuery}
+              onChangeText={setLanguageQuery}
+              placeholder={t("settings.searchLanguage")}
+              placeholderTextColor={theme.colors.textSecondary}
+              autoCapitalize="none"
+            />
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.currencyList}
+            >
+              {filteredLanguages.length > 0 ? (
+                filteredLanguages.map((option) => {
+                  const isActive = option.value === currentLanguage;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => void handleLanguageChange(option.value)}
+                      disabled={isUpdatingSettings}
+                      style={[
+                        styles.currencyOptionRow,
+                        isActive ? styles.currencyOptionRowActive : null
+                      ]}
+                    >
+                      <View style={styles.currencyOptionText}>
+                        <Text style={styles.currencyOptionCode}>{option.label}</Text>
+                        <Text style={styles.currencyOptionName}>
+                          {option.textLocale.toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.currencyOptionStatus,
+                          isActive ? styles.currencyOptionStatusActive : null
+                        ]}
+                      >
+                        {isActive ? t("settings.current") : t("settings.select")}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <View style={styles.emptySheetState}>
+                  <Text style={styles.emptySheetTitle}>{t("settings.noLanguageFoundTitle")}</Text>
+                  <Text style={styles.emptySheetBody}>{t("settings.noLanguageFoundBody")}</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={isCurrencyModalVisible}
         animationType="slide"
         transparent
@@ -477,11 +688,9 @@ export function SettingsScreen(): JSX.Element {
           <View style={[styles.sheet, isCompact ? styles.sheetCompact : null]}>
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderText}>
-                <Text style={styles.sheetEyebrow}>Devise du compte</Text>
+                <Text style={styles.sheetEyebrow}>{copy.accountCurrency}</Text>
                 <Text style={styles.sheetTitle}>{currentCurrency}</Text>
-                <Text style={styles.sheetSubtitle}>
-                  Choisis la devise de reference du compte parmi les devises utilisees dans le monde.
-                </Text>
+                <Text style={styles.sheetSubtitle}>{copy.currencySubtitle}</Text>
               </View>
               <Pressable
                 style={styles.closeButton}
@@ -495,7 +704,7 @@ export function SettingsScreen(): JSX.Element {
               style={styles.input}
               value={currencyQuery}
               onChangeText={setCurrencyQuery}
-              placeholder="Rechercher par code ou nom"
+              placeholder={copy.currencySearch}
               placeholderTextColor={theme.colors.textSecondary}
               autoCapitalize="characters"
             />
@@ -527,7 +736,7 @@ export function SettingsScreen(): JSX.Element {
                         isActive ? styles.currencyOptionStatusActive : null
                       ]}
                     >
-                      {isActive ? "Actuelle" : "Choisir"}
+                      {isActive ? t("settings.current") : t("settings.select")}
                     </Text>
                   </Pressable>
                 );
@@ -821,6 +1030,25 @@ const createStyles = (theme: AppTheme) =>
       paddingTop: spacing.md,
       gap: spacing.sm,
       paddingBottom: spacing.sm
+    },
+    emptySheetState: {
+      minHeight: 180,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg
+    },
+    emptySheetTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      textAlign: "center",
+      color: theme.colors.textPrimary
+    },
+    emptySheetBody: {
+      fontSize: 14,
+      lineHeight: 21,
+      textAlign: "center",
+      color: theme.colors.textSecondary
     },
     currencyOptionRow: {
       flexDirection: "row",

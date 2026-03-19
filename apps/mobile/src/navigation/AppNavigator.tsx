@@ -14,6 +14,7 @@ import { OnboardingScreen } from "../features/auth/OnboardingScreen";
 import { BubbleGalleryScreen } from "../features/dashboard/BubbleGalleryScreen";
 import { DashboardScreen } from "../features/dashboard/DashboardScreen";
 import { AppExperienceOverlay } from "../features/experience/AppExperienceOverlay";
+import { NotificationCenterScreen } from "../features/notifications/NotificationCenterScreen";
 import { ProfileScreen } from "../features/profile/ProfileScreen";
 import { LegalDocumentScreen } from "../features/settings/LegalDocumentScreen";
 import { SettingsScreen } from "../features/settings/SettingsScreen";
@@ -21,6 +22,7 @@ import { StatisticsCalendarScreen } from "../features/statistics/StatisticsCalen
 import { StatisticsScreen } from "../features/statistics/StatisticsScreen";
 import { AddSubscriptionScreen } from "../features/subscriptions/AddSubscriptionScreen";
 import { SubscriptionDetailsScreen } from "../features/subscriptions/SubscriptionDetailsScreen";
+import { SubscriptionPdfExportScreen } from "../features/subscriptions/SubscriptionPdfExportScreen";
 import { SubscriptionListScreen } from "../features/subscriptions/SubscriptionListScreen";
 import { useAppTranslation } from "../i18n";
 import { useAuthStore } from "../store/authStore";
@@ -160,10 +162,14 @@ export function AppNavigator(): JSX.Element {
       content = <BubbleGalleryScreen />;
     } else if (overlayRoute?.name === "Subscriptions") {
       content = <SubscriptionListScreen />;
+    } else if (overlayRoute?.name === "SubscriptionPdfExport") {
+      content = <SubscriptionPdfExportScreen />;
     } else if (overlayRoute?.name === "SubscriptionDetails") {
       content = <SubscriptionDetailsScreen />;
     } else if (overlayRoute?.name === "StatisticsCalendar") {
       content = <StatisticsCalendarScreen />;
+    } else if (overlayRoute?.name === "NotificationCenter") {
+      content = <NotificationCenterScreen />;
     } else if (overlayRoute?.name === "Profile") {
       content = <ProfileScreen />;
     } else if (overlayRoute?.name === "Settings") {

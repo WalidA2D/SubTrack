@@ -1,12 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BillingFrequency, Subscription } from "@subly/shared";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { getActiveFormatLocale, useAppTranslation } from "../i18n";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../theme";
-import { formatCurrency, formatLongDate } from "../utils/format";
+import { formatCurrency } from "../utils/format";
 import { ServiceLogo } from "./ServiceLogo";
-
-type CalendarZoom = "year" | "month" | "week" | "day";
 
 type BillingOccurrence = {
   id: string;
@@ -22,12 +21,8 @@ type PremiumBillingCalendarProps = {
   onOpenSubscription: (subscriptionId: string) => void;
 };
 
-const CALENDAR_VIEWS: Array<{ id: CalendarZoom; label: string }> = [
-  { id: "year", label: "Annee" },
-  { id: "month", label: "Mois" },
-  { id: "week", label: "Semaine" },
-  { id: "day", label: "Jour" }
-];
+const YEAR_CHIP_WIDTH = 84;
+const YEAR_CHIP_SPACING = spacing.sm;
 
 export function PremiumBillingCalendar({
   compact,
@@ -37,217 +32,278 @@ export function PremiumBillingCalendar({
 }: PremiumBillingCalendarProps): JSX.Element {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const [zoom, setZoom] = useState<CalendarZoom>("year");
-  const [cursorDate, setCursorDate] = useState(() => startOfDay(new Date()));
-  const occurrenceRange = useMemo(
-    () => ({
-      start: new Date(cursorDate.getFullYear() - 2, 0, 1),
-      end: new Date(cursorDate.getFullYear() + 3, 0, 0)
-    }),
-    [cursorDate]
-  );
+  const { locale } = useAppTranslation();
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const todayKey = getDateKey(today);
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(today));
+  const [selectedDate, setSelectedDate] = useState(() => today);
+  const [isMonthPickerVisible, setIsMonthPickerVisible] = useState(false);
+  const yearListRef = useRef<FlatList<number>>(null);
+  const formatLocale = getActiveFormatLocale();
+
+  const monthStart = useMemo(() => startOfMonth(visibleMonth), [visibleMonth]);
+  const monthEnd = useMemo(() => endOfMonth(visibleMonth), [visibleMonth]);
+  const calendarWeeks = useMemo(() => buildMonthWeeks(visibleMonth), [visibleMonth]);
   const occurrences = useMemo(
-    () => buildBillingOccurrences(subscriptions, occurrenceRange.start, occurrenceRange.end),
-    [occurrenceRange.end, occurrenceRange.start, subscriptions]
+    () => buildBillingOccurrences(subscriptions, monthStart, monthEnd),
+    [monthEnd, monthStart, subscriptions]
   );
-  const occurrencesByDate = useMemo(() => {
-    return occurrences.reduce<Record<string, BillingOccurrence[]>>((accumulator, occurrence) => {
-      accumulator[occurrence.dateKey] = [...(accumulator[occurrence.dateKey] ?? []), occurrence];
-      return accumulator;
-    }, {});
-  }, [occurrences]);
-  const visibleYears = useMemo(() => getVisibleYears(cursorDate), [cursorDate]);
-  const monthCells = useMemo(() => getMonthCells(cursorDate), [cursorDate]);
-  const weekDays = useMemo(() => getWeekDays(cursorDate), [cursorDate]);
-  const dayEvents = occurrencesByDate[getDateKey(cursorDate)] ?? [];
-  const headerLabel = getHeaderLabel(zoom, cursorDate);
+  const occurrencesByDate = useMemo(
+    () =>
+      occurrences.reduce<Record<string, BillingOccurrence[]>>((accumulator, occurrence) => {
+        accumulator[occurrence.dateKey] = [...(accumulator[occurrence.dateKey] ?? []), occurrence];
+        return accumulator;
+      }, {}),
+    [occurrences]
+  );
+  const selectedDateKey = getDateKey(selectedDate);
+  const selectedDayEvents = occurrencesByDate[selectedDateKey] ?? [];
+  const monthLabel = new Intl.DateTimeFormat(formatLocale, {
+    month: "long",
+    year: "numeric"
+  }).format(visibleMonth);
+  const yearOptions = useMemo(() => {
+    const centerYear = visibleMonth.getFullYear();
+
+    return Array.from({ length: 21 }, (_, index) => centerYear - 10 + index);
+  }, [visibleMonth]);
+  const initialYearIndex = useMemo(
+    () => Math.max(yearOptions.findIndex((year) => year === today.getFullYear()), 0),
+    [today, yearOptions]
+  );
+  const monthOptions = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(formatLocale, { month: "long" });
+
+    return Array.from({ length: 12 }, (_, index) => ({
+      index,
+      label: formatter.format(new Date(2026, index, 1))
+    }));
+  }, [formatLocale]);
+  const dayLabels = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(formatLocale, { weekday: "short" });
+    return Array.from({ length: 7 }, (_, index) => {
+      const label = formatter.format(new Date(Date.UTC(2026, 2, 1 + index)));
+      return locale === "fr" ? label.toLowerCase() : label;
+    });
+  }, [formatLocale, locale]);
+
+  useEffect(() => {
+    const activeYearIndex = yearOptions.findIndex((year) => year === visibleMonth.getFullYear());
+
+    if (activeYearIndex < 0) {
+      return;
+    }
+
+    const animationFrame = requestAnimationFrame(() => {
+      yearListRef.current?.scrollToIndex({
+        animated: true,
+        index: activeYearIndex,
+        viewPosition: 0.5
+      });
+    });
+
+    return () => cancelAnimationFrame(animationFrame);
+  }, [visibleMonth, yearOptions]);
+
+  const handleChangeMonth = (direction: -1 | 1) => {
+    const nextMonth = addMonths(visibleMonth, direction);
+    setVisibleMonth(nextMonth);
+    setSelectedDate(startOfMonth(nextMonth));
+    setIsMonthPickerVisible(false);
+  };
+
+  const handleSelectYear = (year: number) => {
+    const nextMonth = startOfMonth(new Date(year, visibleMonth.getMonth(), 1));
+    setVisibleMonth(nextMonth);
+    setSelectedDate(startOfMonth(nextMonth));
+    setIsMonthPickerVisible(false);
+  };
+
+  const handleSelectMonth = (monthIndex: number) => {
+    const nextMonth = startOfMonth(new Date(visibleMonth.getFullYear(), monthIndex, 1));
+    setVisibleMonth(nextMonth);
+    setSelectedDate(startOfMonth(nextMonth));
+    setIsMonthPickerVisible(false);
+  };
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.header, compact ? styles.headerCompact : null]}>
-        <View style={styles.headerText}>
-          <Text style={styles.eyebrow}>Premium</Text>
-          <Text style={styles.title}>Calendrier des abonnements</Text>
-          <Text style={styles.body}>
-            Repere rapidement les periodes chargees. Le point jaune signale au moins un
-            prelevement, et la vue jour affiche les logos cliquables des abonnements prevus.
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
+    <View style={styles.calendar}>
+      <View style={styles.monthHeader}>
+        <Pressable
+          hitSlop={8}
+          onPress={() => setIsMonthPickerVisible((currentValue) => !currentValue)}
+          style={styles.monthSelectorButton}
+        >
+          <Text style={styles.monthLabel}>{monthLabel}</Text>
+          <Text style={styles.monthSelectorChevron}>{isMonthPickerVisible ? "^" : "v"}</Text>
+        </Pressable>
+        <View style={styles.monthNavigation}>
           <Pressable
-            style={styles.navButton}
-            onPress={() => setCursorDate(shiftCursor(cursorDate, zoom, -1))}
+            hitSlop={8}
+            onPress={() => handleChangeMonth(-1)}
+            style={styles.monthNavButton}
           >
-            <Text style={styles.navButtonLabel}>‹</Text>
+            <Text style={styles.monthNavLabel}>{"<"}</Text>
           </Pressable>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeLabel}>{headerLabel}</Text>
-          </View>
           <Pressable
-            style={styles.navButton}
-            onPress={() => setCursorDate(shiftCursor(cursorDate, zoom, 1))}
+            hitSlop={8}
+            onPress={() => handleChangeMonth(1)}
+            style={styles.monthNavButton}
           >
-            <Text style={styles.navButtonLabel}>›</Text>
+            <Text style={styles.monthNavLabel}>{">"}</Text>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.viewSwitchRow}>
-        {CALENDAR_VIEWS.map((view) => {
-          const isActive = zoom === view.id;
+      {isMonthPickerVisible ? (
+        <View style={styles.monthPicker}>
+          <View style={styles.monthPickerGrid}>
+            {monthOptions.map((monthOption) => {
+              const isActive = monthOption.index === visibleMonth.getMonth();
+
+              return (
+                <Pressable
+                  key={monthOption.index}
+                  hitSlop={8}
+                  onPress={() => handleSelectMonth(monthOption.index)}
+                  style={[styles.monthChip, isActive ? styles.monthChipActive : null]}
+                >
+                  <Text
+                    style={[
+                      styles.monthChipLabel,
+                      isActive ? styles.monthChipLabelActive : null
+                    ]}
+                  >
+                    {monthOption.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
+      <FlatList
+        ref={yearListRef}
+        data={yearOptions}
+        horizontal
+        initialScrollIndex={initialYearIndex}
+        keyExtractor={(year) => String(year)}
+        renderItem={({ item: year }) => {
+          const isActive = year === visibleMonth.getFullYear();
 
           return (
             <Pressable
-              key={view.id}
-              style={[styles.viewSwitchChip, isActive ? styles.viewSwitchChipActive : null]}
-              onPress={() => setZoom(view.id)}
+              hitSlop={8}
+              onPress={() => handleSelectYear(year)}
+              style={[styles.yearChip, isActive ? styles.yearChipActive : null]}
             >
-              <Text
-                style={[
-                  styles.viewSwitchLabel,
-                  isActive ? styles.viewSwitchLabelActive : null
-                ]}
-              >
-                {view.label}
+              <Text style={[styles.yearChipLabel, isActive ? styles.yearChipLabelActive : null]}>
+                {year}
               </Text>
             </Pressable>
           );
+        }}
+        getItemLayout={(_, index) => ({
+          index,
+          length: YEAR_CHIP_WIDTH + YEAR_CHIP_SPACING,
+          offset: (YEAR_CHIP_WIDTH + YEAR_CHIP_SPACING) * index
         })}
+        onScrollToIndexFailed={(info) => {
+          yearListRef.current?.scrollToOffset({
+            animated: true,
+            offset: (YEAR_CHIP_WIDTH + YEAR_CHIP_SPACING) * info.index
+          });
+        }}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.yearScrollContent}
+      />
+
+      <View style={styles.weekdayRow}>
+        {dayLabels.map((label) => (
+          <View key={label} style={styles.weekdayCell}>
+            <Text style={styles.weekdayLabel}>{label}</Text>
+          </View>
+        ))}
       </View>
 
-      {zoom === "year" ? (
-        <View style={[styles.yearGrid, compact ? styles.yearGridCompact : null]}>
-          {visibleYears.map((year) => {
-            const yearHasBilling = occurrences.some(
-              (occurrence) => occurrence.date.getFullYear() === year
-            );
-            const isSelected = cursorDate.getFullYear() === year;
+      <View style={styles.grid}>
+        {calendarWeeks.map((week, weekIndex) => (
+          <View key={`week_${weekIndex}`} style={styles.weekRow}>
+            {week.map((day, dayIndex) => {
+              if (!day) {
+                return (
+                  <View
+                    key={`empty_${weekIndex}_${dayIndex}`}
+                    style={[styles.dayCell, styles.dayCellEmpty]}
+                  />
+                );
+              }
 
-            return (
-              <Pressable
-                key={year}
-                style={[styles.periodCard, isSelected ? styles.periodCardActive : null]}
-                onPress={() => {
-                  setCursorDate(new Date(year, 0, 1));
-                  setZoom("month");
-                }}
-              >
-                <Text style={styles.periodTitle}>{year}</Text>
-                <View style={styles.periodMetaRow}>
-                  <Text style={styles.periodMeta}>Vue annuelle</Text>
-                  {yearHasBilling ? <View style={styles.eventDot} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+              const dateKey = getDateKey(day);
+              const isSelected = dateKey === selectedDateKey;
+              const isToday = dateKey === todayKey;
+              const hasBilling = Boolean(occurrencesByDate[dateKey]?.length);
 
-      {zoom === "month" ? (
-        <View style={[styles.monthGrid, compact ? styles.monthGridCompact : null]}>
-          {monthCells.map((cell) => {
-            const monthHasBilling = occurrences.some(
-              (occurrence) =>
-                occurrence.date.getFullYear() === cell.date.getFullYear() &&
-                occurrence.date.getMonth() === cell.date.getMonth()
-            );
-            const isSelected =
-              cursorDate.getFullYear() === cell.date.getFullYear() &&
-              cursorDate.getMonth() === cell.date.getMonth();
-
-            return (
-              <Pressable
-                key={cell.id}
-                style={[styles.periodCard, isSelected ? styles.periodCardActive : null]}
-                onPress={() => {
-                  setCursorDate(cell.date);
-                  setZoom("week");
-                }}
-              >
-                <Text style={styles.periodTitle}>{cell.label}</Text>
-                <View style={styles.periodMetaRow}>
-                  <Text style={styles.periodMeta}>Mois</Text>
-                  {monthHasBilling ? <View style={styles.eventDot} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-
-      {zoom === "week" ? (
-        <View style={[styles.weekRow, compact ? styles.weekRowCompact : null]}>
-          {weekDays.map((day) => {
-            const dayHasBilling = Boolean(occurrencesByDate[getDateKey(day)]);
-            const isSelected = getDateKey(day) === getDateKey(cursorDate);
-
-            return (
-              <Pressable
-                key={getDateKey(day)}
-                style={[styles.dayCard, isSelected ? styles.dayCardActive : null]}
-                onPress={() => {
-                  setCursorDate(day);
-                  setZoom("day");
-                }}
-              >
-                <Text style={styles.dayCardEyebrow}>
-                  {new Intl.DateTimeFormat("fr-FR", { weekday: "short" }).format(day)}
-                </Text>
-                <Text style={styles.dayCardValue}>{day.getDate()}</Text>
-                {dayHasBilling ? <View style={styles.eventDot} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-
-      {zoom === "day" ? (
-        <View style={styles.dayPanel}>
-          <View style={styles.dayPanelHeader}>
-            <Text style={styles.dayPanelTitle}>{formatLongDate(cursorDate.toISOString())}</Text>
-            <Text style={styles.dayPanelMeta}>
-              {dayEvents.length > 0
-                ? `${dayEvents.length} abonnement(s) prevu(s)`
-                : "Aucun abonnement prevu"}
-            </Text>
-          </View>
-
-          {dayEvents.length > 0 ? (
-            <View style={styles.dayEventList}>
-              {dayEvents.map((occurrence) => (
+              return (
                 <Pressable
-                  key={occurrence.id}
-                  style={styles.dayEventRow}
-                  onPress={() => onOpenSubscription(occurrence.subscription.id)}
+                  key={dateKey}
+                  onPress={() => setSelectedDate(day)}
+                  style={[
+                    styles.dayCell,
+                    compact ? styles.dayCellCompact : null,
+                    isToday ? styles.dayCellToday : null,
+                    isSelected ? styles.dayCellSelected : null
+                  ]}
                 >
-                  <View style={styles.dayEventIdentity}>
-                    <ServiceLogo providerName={occurrence.subscription.providerName} size={44} />
-                    <View style={styles.dayEventText}>
-                      <Text style={styles.dayEventTitle}>
-                        {occurrence.subscription.providerName}
-                      </Text>
-                      <Text style={styles.dayEventSubtitle}>
-                        {occurrence.subscription.categoryName}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.dayEventAmountWrap}>
-                    <Text style={styles.dayEventAmount}>
-                      {formatCurrency(occurrence.subscription.price, currency)}
-                    </Text>
-                    <Text style={styles.dayEventHint}>Ouvrir</Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.dayLabel,
+                      isToday && !isSelected ? styles.dayLabelToday : null,
+                      isSelected ? styles.dayLabelSelected : null
+                    ]}
+                  >
+                    {day.getDate()}
+                  </Text>
+                  {hasBilling ? (
+                    <View
+                      style={[
+                        styles.eventDot,
+                        isSelected ? styles.eventDotSelected : null
+                      ]}
+                    />
+                  ) : null}
                 </Pressable>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                Cette journee est libre. Change de jour, de semaine ou de mois pour voir les
-                prochains prelevements.
+              );
+            })}
+          </View>
+        ))}
+      </View>
+
+      {selectedDayEvents.length > 0 ? (
+        <View style={styles.eventList}>
+          {selectedDayEvents.map((occurrence) => (
+            <Pressable
+              key={occurrence.id}
+              onPress={() => onOpenSubscription(occurrence.subscription.id)}
+              style={styles.eventCard}
+            >
+              <View style={styles.eventIdentity}>
+                <ServiceLogo providerName={occurrence.subscription.providerName} size={42} />
+                <View style={styles.eventText}>
+                  <Text numberOfLines={1} style={styles.eventTitle}>
+                    {occurrence.subscription.providerName}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.eventSubtitle}>
+                    {occurrence.subscription.categoryName}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.eventAmount}>
+                {formatCurrency(occurrence.subscription.price, currency)}
               </Text>
-            </View>
-          )}
+            </Pressable>
+          ))}
         </View>
       ) : null}
     </View>
@@ -316,85 +372,45 @@ function addCycle(date: Date, frequency: BillingFrequency) {
   return startOfDay(nextDate);
 }
 
-function getVisibleYears(cursorDate: Date) {
-  const centerYear = cursorDate.getFullYear();
+function buildMonthWeeks(date: Date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadingEmptyCells = firstDayOfMonth.getDay();
+  const cells: Array<Date | null> = Array.from({ length: leadingEmptyCells }, () => null);
 
-  return Array.from({ length: 5 }, (_, index) => centerYear - 2 + index);
-}
-
-function getMonthCells(cursorDate: Date) {
-  return Array.from({ length: 12 }, (_, index) => {
-    const date = new Date(cursorDate.getFullYear(), index, 1);
-
-    return {
-      id: `${date.getFullYear()}-${index}`,
-      date,
-      label: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)
-    };
-  });
-}
-
-function getWeekDays(cursorDate: Date) {
-  const start = startOfWeek(cursorDate);
-
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    return startOfDay(date);
-  });
-}
-
-function getHeaderLabel(zoom: CalendarZoom, cursorDate: Date) {
-  if (zoom === "year") {
-    const years = getVisibleYears(cursorDate);
-    return `${years[0]} - ${years[years.length - 1]}`;
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(new Date(year, month, day));
   }
 
-  if (zoom === "month") {
-    return String(cursorDate.getFullYear());
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
   }
 
-  if (zoom === "week") {
-    const weekDays = getWeekDays(cursorDate);
-    return `${formatShortCalendarLabel(weekDays[0])} - ${formatShortCalendarLabel(
-      weekDays[weekDays.length - 1]
-    )}`;
+  const weeks: Array<Array<Date | null>> = [];
+
+  for (let index = 0; index < cells.length; index += 7) {
+    weeks.push(cells.slice(index, index + 7));
   }
 
-  return formatLongDate(cursorDate.toISOString());
-}
-
-function shiftCursor(cursorDate: Date, zoom: CalendarZoom, direction: -1 | 1) {
-  const nextDate = new Date(cursorDate);
-
-  if (zoom === "year") {
-    nextDate.setFullYear(nextDate.getFullYear() + direction * 5);
-    return startOfDay(nextDate);
-  }
-
-  if (zoom === "month") {
-    nextDate.setFullYear(nextDate.getFullYear() + direction);
-    return startOfDay(nextDate);
-  }
-
-  if (zoom === "week") {
-    nextDate.setDate(nextDate.getDate() + direction * 7);
-    return startOfDay(nextDate);
-  }
-
-  nextDate.setDate(nextDate.getDate() + direction);
-  return startOfDay(nextDate);
+  return weeks;
 }
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function startOfWeek(date: Date) {
-  const nextDate = startOfDay(date);
-  const dayOffset = (nextDate.getDay() + 6) % 7;
-  nextDate.setDate(nextDate.getDate() - dayOffset);
-  return nextDate;
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function addMonths(date: Date, amount: number) {
+  return startOfMonth(new Date(date.getFullYear(), date.getMonth() + amount, 1));
 }
 
 function getDateKey(date: Date) {
@@ -403,276 +419,230 @@ function getDateKey(date: Date) {
   ).padStart(2, "0")}`;
 }
 
-function formatShortCalendarLabel(date: Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit"
-  }).format(date);
-}
-
 const createStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    card: {
-      backgroundColor: theme.colors.surfaceRaised,
-      borderRadius: radius.md,
-      padding: spacing.lg,
-      gap: spacing.lg,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      ...shadows.card
+    calendar: {
+      gap: spacing.lg
     },
-    header: {
+    monthHeader: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       justifyContent: "space-between",
       gap: spacing.md
     },
-    headerCompact: {
-      flexDirection: "column"
-    },
-    headerText: {
+    monthSelectorButton: {
       flex: 1,
-      gap: 4
-    },
-    eyebrow: {
-      fontSize: 11,
-      fontWeight: "700",
-      letterSpacing: 0.8,
-      textTransform: "uppercase",
-      color: theme.colors.primary
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: "800",
-      color: theme.colors.textPrimary
-    },
-    body: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary
-    },
-    headerActions: {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm
     },
-    navButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surfaceContrast,
-      borderWidth: 1,
-      borderColor: theme.colors.borderStrong
-    },
-    navButtonLabel: {
-      fontSize: 22,
-      lineHeight: 22,
+    monthLabel: {
+      fontSize: 28,
+      fontWeight: "800",
       color: theme.colors.textPrimary
     },
-    headerBadge: {
-      minHeight: 38,
-      maxWidth: 190,
-      paddingHorizontal: spacing.md,
-      borderRadius: 19,
+    monthSelectorChevron: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.colors.textSecondary
+    },
+    monthNavigation: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm
+    },
+    monthNavButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceContrast,
+      backgroundColor: "rgba(255,255,255,0.04)",
       borderWidth: 1,
       borderColor: theme.colors.borderStrong
     },
-    headerBadgeLabel: {
-      fontSize: 12,
+    monthNavLabel: {
+      fontSize: 20,
+      lineHeight: 20,
       fontWeight: "700",
-      textAlign: "center",
       color: theme.colors.textPrimary
     },
-    viewSwitchRow: {
+    monthPicker: {
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: theme.colors.borderStrong,
+      ...shadows.card
+    },
+    monthPickerGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.sm
     },
-    viewSwitchChip: {
-      minHeight: 38,
-      paddingHorizontal: spacing.md,
-      borderRadius: 999,
+    monthChip: {
+      flexBasis: "31%",
+      minHeight: 44,
+      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceContrast,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      backgroundColor: theme.colors.background,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
-    viewSwitchChipActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: "rgba(255, 184, 77, 0.16)"
+    monthChipActive: {
+      backgroundColor: theme.colors.surfaceContrast,
+      borderColor: theme.colors.primaryStrong
     },
-    viewSwitchLabel: {
-      fontSize: 12,
+    monthChipLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.colors.textSecondary,
+      textTransform: "capitalize"
+    },
+    monthChipLabelActive: {
+      color: theme.colors.textPrimary
+    },
+    yearScrollContent: {
+      gap: spacing.sm,
+      paddingRight: spacing.md
+    },
+    yearChip: {
+      width: YEAR_CHIP_WIDTH,
+      minHeight: 42,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.md,
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    yearChipActive: {
+      backgroundColor: theme.colors.surfaceContrast,
+      borderColor: theme.colors.primaryStrong,
+      ...shadows.card
+    },
+    yearChipLabel: {
+      fontSize: 14,
       fontWeight: "700",
       color: theme.colors.textSecondary
     },
-    viewSwitchLabelActive: {
+    yearChipLabelActive: {
       color: theme.colors.textPrimary
     },
-    yearGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.md
-    },
-    yearGridCompact: {
-      flexDirection: "column"
-    },
-    monthGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.md
-    },
-    monthGridCompact: {
-      gap: spacing.sm
-    },
-    periodCard: {
-      minWidth: 104,
-      flex: 1,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      gap: spacing.md,
-      backgroundColor: theme.colors.backgroundElevated,
-      borderWidth: 1,
-      borderColor: theme.colors.borderStrong
-    },
-    periodCardActive: {
-      borderColor: theme.colors.primary
-    },
-    periodTitle: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: theme.colors.textPrimary
-    },
-    periodMetaRow: {
+    weekdayRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      gap: spacing.sm
+      gap: spacing.xs
     },
-    periodMeta: {
-      fontSize: 12,
+    weekdayCell: {
+      flex: 1,
+      alignItems: "center"
+    },
+    weekdayLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      textTransform: "lowercase",
       color: theme.colors.textSecondary
     },
-    eventDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 999,
-      backgroundColor: "#F7D154"
+    grid: {
+      gap: spacing.xs
     },
     weekRow: {
       flexDirection: "row",
-      gap: spacing.sm
+      gap: spacing.xs
     },
-    weekRowCompact: {
-      flexWrap: "wrap"
-    },
-    dayCard: {
+    dayCell: {
       flex: 1,
-      minWidth: 78,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      gap: spacing.xs,
+      aspectRatio: 0.88,
+      borderRadius: 14,
       alignItems: "center",
-      backgroundColor: theme.colors.backgroundElevated,
+      justifyContent: "center",
+      backgroundColor: "#0B0B10",
       borderWidth: 1,
-      borderColor: theme.colors.borderStrong
+      borderColor: "rgba(255,255,255,0.04)",
+      position: "relative"
     },
-    dayCardActive: {
-      borderColor: theme.colors.primary
+    dayCellCompact: {
+      aspectRatio: 0.8,
+      borderRadius: 12
     },
-    dayCardEyebrow: {
-      fontSize: 11,
+    dayCellEmpty: {
+      backgroundColor: "transparent",
+      borderColor: "transparent"
+    },
+    dayCellToday: {
+      borderColor: theme.colors.primaryStrong
+    },
+    dayCellSelected: {
+      backgroundColor: theme.colors.white,
+      borderColor: theme.colors.white,
+      ...shadows.card
+    },
+    dayLabel: {
+      fontSize: 18,
       fontWeight: "700",
-      textTransform: "uppercase",
-      color: theme.colors.textTertiary
-    },
-    dayCardValue: {
-      fontSize: 22,
-      fontWeight: "800",
       color: theme.colors.textPrimary
     },
-    dayPanel: {
-      gap: spacing.md
+    dayLabelToday: {
+      color: theme.colors.primary
     },
-    dayPanelHeader: {
-      gap: 4
+    dayLabelSelected: {
+      color: theme.colors.background
     },
-    dayPanelTitle: {
-      fontSize: 17,
-      fontWeight: "800",
-      color: theme.colors.textPrimary
+    eventDot: {
+      position: "absolute",
+      bottom: 8,
+      width: 6,
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: theme.colors.secondary
     },
-    dayPanelMeta: {
-      fontSize: 13,
-      color: theme.colors.textSecondary
+    eventDotSelected: {
+      backgroundColor: theme.colors.background
     },
-    dayEventList: {
-      gap: spacing.sm
+    eventList: {
+      gap: spacing.sm,
+      paddingTop: spacing.xs
     },
-    dayEventRow: {
+    eventCard: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: spacing.md,
       borderRadius: radius.md,
-      padding: spacing.md,
-      backgroundColor: theme.colors.backgroundElevated,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+      backgroundColor: theme.colors.surfaceRaised,
       borderWidth: 1,
-      borderColor: theme.colors.borderStrong
+      borderColor: theme.colors.borderStrong,
+      ...shadows.card
     },
-    dayEventIdentity: {
+    eventIdentity: {
       flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md
     },
-    dayEventText: {
+    eventText: {
       flex: 1,
-      gap: 4
+      gap: 2
     },
-    dayEventTitle: {
+    eventTitle: {
       fontSize: 15,
       fontWeight: "700",
       color: theme.colors.textPrimary
     },
-    dayEventSubtitle: {
+    eventSubtitle: {
       fontSize: 12,
       color: theme.colors.textSecondary
     },
-    dayEventAmountWrap: {
-      alignItems: "flex-end",
-      gap: 2
-    },
-    dayEventAmount: {
+    eventAmount: {
       fontSize: 14,
       fontWeight: "800",
       color: theme.colors.textPrimary
-    },
-    dayEventHint: {
-      fontSize: 11,
-      textTransform: "uppercase",
-      color: theme.colors.primary
-    },
-    emptyState: {
-      minHeight: 120,
-      borderRadius: radius.md,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: spacing.lg,
-      backgroundColor: theme.colors.backgroundElevated,
-      borderWidth: 1,
-      borderColor: theme.colors.border
-    },
-    emptyStateText: {
-      fontSize: 14,
-      lineHeight: 21,
-      textAlign: "center",
-      color: theme.colors.textSecondary
     }
   });

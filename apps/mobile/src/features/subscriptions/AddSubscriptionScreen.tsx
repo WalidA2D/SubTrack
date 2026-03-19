@@ -34,6 +34,7 @@ import { PrimaryButton } from "../../components/PrimaryButton";
 import { PromoCard } from "../../components/PromoCard";
 import { ServiceLogo } from "../../components/ServiceLogo";
 import { isPremiumPlan } from "../../constants/premium";
+import { useAppTranslation } from "../../i18n";
 import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
@@ -47,42 +48,55 @@ import {
 
 type ComposerStep = "service" | "billing" | "options";
 
-const FREQUENCY_OPTIONS: Array<{ label: string; value: BillingFrequency }> = [
-  { label: "Hebdo", value: "weekly" },
-  { label: "Mensuel", value: "monthly" },
-  { label: "Trimestriel", value: "quarterly" },
-  { label: "Annuel", value: "yearly" },
-];
+const DEFAULT_REMINDER_DAYS = "3";
+const SCROLL_TO_TOP_VISIBILITY_OFFSET = 260;
 
-const TRIAL_OPTIONS = [
-  { label: "Non", value: "inactive" },
-  { label: "Oui", value: "active" }
-] as const;
+function buildFrequencyOptions(isFrench: boolean): Array<{ label: string; value: BillingFrequency }> {
+  return [
+    { label: isFrench ? "Hebdo" : "Weekly", value: "weekly" },
+    { label: isFrench ? "Mensuel" : "Monthly", value: "monthly" },
+    { label: isFrench ? "Trimestriel" : "Quarterly", value: "quarterly" },
+    { label: isFrench ? "Annuel" : "Yearly", value: "yearly" }
+  ];
+}
 
-const LOGO_MODE_OPTIONS: Array<{
+function buildTrialOptions(isFrench: boolean) {
+  return [
+    { label: isFrench ? "Non" : "No", value: "inactive" },
+    { label: isFrench ? "Oui" : "Yes", value: "active" }
+  ] as const;
+}
+
+function buildLogoModeOptions(isFrench: boolean): Array<{
   label: string;
   value: SubscriptionLogoMode;
   description: string;
-}> = [
-  {
-    label: "Logo de l'offre",
-    value: "option",
-    description: "Affiche le visuel propre a la formule choisie."
-  },
-  {
-    label: "Logo de base",
-    value: "base",
-    description: "Affiche le logo principal du service, peu importe la formule."
-  }
-];
+}> {
+  return [
+    {
+      label: isFrench ? "Logo de l'offre" : "Plan logo",
+      value: "option",
+      description: isFrench
+        ? "Affiche le visuel propre a la formule choisie."
+        : "Shows the visual specific to the selected plan."
+    },
+    {
+      label: isFrench ? "Logo de base" : "Base logo",
+      value: "base",
+      description: isFrench
+        ? "Affiche le logo principal du service, peu importe la formule."
+        : "Shows the main service logo regardless of the selected plan."
+    }
+  ];
+}
 
-const DEFAULT_REMINDER_DAYS = "3";
-const SCROLL_TO_TOP_VISIBILITY_OFFSET = 260;
-const COMPOSER_STEPS: Array<{ id: ComposerStep; label: string; eyebrow: string }> = [
-  { id: "service", label: "Service", eyebrow: "1" },
-  { id: "billing", label: "Facturation", eyebrow: "2" },
-  { id: "options", label: "Options", eyebrow: "3" }
-];
+function buildComposerSteps(isFrench: boolean): Array<{ id: ComposerStep; label: string; eyebrow: string }> {
+  return [
+    { id: "service", label: isFrench ? "Service" : "Service", eyebrow: "1" },
+    { id: "billing", label: isFrench ? "Facturation" : "Billing", eyebrow: "2" },
+    { id: "options", label: isFrench ? "Options" : "Options", eyebrow: "3" }
+  ];
+}
 
 export function AddSubscriptionScreen(): JSX.Element {
   const { width } = useWindowDimensions();
@@ -90,6 +104,8 @@ export function AddSubscriptionScreen(): JSX.Element {
   const isTablet = width >= 768;
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const navigation = useAppNavigation();
   const route = useCurrentOverlayRoute();
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
@@ -130,6 +146,186 @@ export function AddSubscriptionScreen(): JSX.Element {
     profile?.notificationPreferences?.defaultReminderDaysBefore ?? Number(DEFAULT_REMINDER_DAYS)
   );
   const isPremium = isPremiumPlan(profile);
+  const frequencyOptions = useMemo(() => buildFrequencyOptions(isFrench), [isFrench]);
+  const trialOptions = useMemo(() => buildTrialOptions(isFrench), [isFrench]);
+  const logoModeOptions = useMemo(() => buildLogoModeOptions(isFrench), [isFrench]);
+  const composerSteps = useMemo(() => buildComposerSteps(isFrench), [isFrench]);
+  const copy = useMemo(
+    () => ({
+      all: isFrench ? "Tous" : "All",
+      limitReachedTitle: isFrench ? "Limite atteinte" : "Limit reached",
+      limitReachedBody: (limit: number) =>
+        isFrench
+          ? `Le plan gratuit permet jusqu'a ${limit} services inclus par abonnement. Passe au Premium pour en ajouter autant que tu veux.`
+          : `The free plan allows up to ${limit} included services per subscription. Upgrade to Premium to add as many as you want.`,
+      missingInfoTitle: isFrench ? "Informations manquantes" : "Missing information",
+      missingInfoBody: isFrench
+        ? "Choisis d'abord le service et la categorie a suivre."
+        : "Choose the service and category to track first.",
+      invalidPriceTitle: isFrench ? "Prix invalide" : "Invalid price",
+      invalidPriceBody: isFrench
+        ? "Entre un montant superieur a zero."
+        : "Enter an amount greater than zero.",
+      missingDateTitle: isFrench ? "Date manquante" : "Missing date",
+      missingDateBody: isFrench
+        ? "Ajoute la prochaine date de facturation."
+        : "Add the next billing date.",
+      invalidDateTitle: isFrench ? "Date invalide" : "Invalid date",
+      invalidDateBody: isFrench
+        ? "Utilise le format europeen JJ/MM/AAAA."
+        : "Use the European DD/MM/YYYY format.",
+      invalidReminderTitle: isFrench ? "Rappel invalide" : "Invalid reminder",
+      invalidReminderBody: isFrench
+        ? "Le nombre de jours doit etre positif."
+        : "The number of days must be positive.",
+      incompleteTrialTitle: isFrench ? "Essai gratuit incomplet" : "Incomplete free trial",
+      incompleteTrialBody: isFrench
+        ? "Indique la date de fin de l'essai gratuit."
+        : "Enter the free trial end date.",
+      invalidTrialDateTitle: isFrench ? "Date d'essai invalide" : "Invalid trial date",
+      incompleteFieldsTitle: isFrench ? "Champs incomplets" : "Incomplete fields",
+      incompleteFieldsBody: isFrench
+        ? "Renseigne le service, la categorie et la date."
+        : "Fill in the service, category and date.",
+      tooManyIncludedTitle: isFrench ? "Trop de services inclus" : "Too many included services",
+      tooManyIncludedBody: (limit: number) =>
+        isFrench
+          ? `Le plan gratuit permet jusqu'a ${limit} services inclus par abonnement. Passe au Premium pour supprimer cette limite.`
+          : `The free plan allows up to ${limit} included services per subscription. Upgrade to Premium to remove this limit.`,
+      inconsistentDatesTitle: isFrench ? "Dates incoherentes" : "Inconsistent dates",
+      inconsistentDatesBody: isFrench
+        ? "Le premier paiement doit etre le meme jour ou apres la fin de l'essai gratuit."
+        : "The first payment must happen on or after the free trial ends.",
+      verifyDatesBody: isFrench ? "Verifie les dates saisies." : "Check the entered dates.",
+      updatedTitle: isFrench ? "Abonnement mis a jour" : "Subscription updated",
+      addedTitle: isFrench ? "Abonnement ajoute" : "Subscription added",
+      updatedBody: isFrench
+        ? "Les modifications ont bien ete enregistrees."
+        : "Your changes have been saved.",
+      addedBody: isFrench
+        ? "Le nouvel abonnement a ete ajoute a ton espace Subly."
+        : "The new subscription was added to your Subly space.",
+      saveFailedTitle: isFrench ? "Enregistrement impossible" : "Unable to save",
+      saveFailedBody: isFrench ? "Merci de reessayer." : "Please try again.",
+      editTitle: isFrench ? "Modifier un abonnement" : "Edit a subscription",
+      addTitle: isFrench ? "Ajouter un abonnement" : "Add a subscription",
+      searchPlaceholder: isFrench
+        ? "Streaming, musique, jeux et plus encore..."
+        : "Streaming, music, gaming and more...",
+      helperTitle: isFrench ? "Catalogue Subly" : "Subly catalog",
+      helperBody: (reminderLabel: string) =>
+        isFrench
+          ? `Choisis un service pour ouvrir une creation guidee en trois etapes. Le rappel par defaut de ton compte est actuellement regle sur ${reminderLabel.toLowerCase()}.`
+          : `Choose a service to open a guided three-step setup. Your account default reminder is currently set to ${reminderLabel.toLowerCase()}.`,
+      emptyTitle: isFrench ? "Aucun service trouve" : "No service found",
+      emptyBody: isFrench
+        ? "Essaie une autre recherche ou cree directement un abonnement personnalise."
+        : "Try another search or create a custom subscription directly.",
+      customCardTitle: isFrench ? "Abonnement personnalise" : "Custom subscription",
+      customCardBody: isFrench
+        ? "Tu ne trouves pas ton service ? Cree une fiche libre avec le nom et la categorie de ton choix."
+        : "Can't find your service? Create a custom record with the name and category you want.",
+      customSheetTitle: isFrench ? "Abonnement personnalise" : "Custom subscription",
+      freeService: isFrench ? "Service libre" : "Free-form service",
+      selectedServiceHint: isFrench ? "Service preselectionne" : "Preselected service",
+      selectedServiceBody: (suggestedPrice: number) =>
+        isFrench
+          ? `Prix laisse vide volontairement. Tarif indicatif : ${formatCurrency(suggestedPrice, profile?.currency ?? "EUR")}.`
+          : `Price intentionally left empty. Suggested price: ${formatCurrency(suggestedPrice, profile?.currency ?? "EUR")}.`,
+      customModeTitle: isFrench ? "Mode personnalise" : "Custom mode",
+      customModeBody: isFrench
+        ? "Tu peux creer un abonnement qui n'est pas dans le catalogue."
+        : "You can create a subscription that is not in the catalog.",
+      stepDone: isFrench ? "OK" : "Done",
+      step1Title: isFrench ? "Etape 1" : "Step 1",
+      step1Body: isFrench
+        ? "Choisis le service suivi, la formule si besoin, puis la categorie qui alimentera les listes et les statistiques."
+        : "Choose the tracked service, the plan if needed, then the category used in lists and statistics.",
+      step2Title: isFrench ? "Etape 2" : "Step 2",
+      step2Body: isFrench
+        ? "Definis le prix, la frequence, la date cle et le rappel de paiement."
+        : "Set the price, frequency, key date and payment reminder.",
+      step3Title: isFrench ? "Etape 3" : "Step 3",
+      step3Body: isFrench
+        ? "Termine avec les services inclus et les notes qui aideront pour le suivi."
+        : "Finish with included services and notes to help with tracking.",
+      serviceName: isFrench ? "Nom du service" : "Service name",
+      displayedLogo: isFrench ? "Logo affiche" : "Displayed logo",
+      displayedLogoHint: (baseProviderName: string) =>
+        isFrench
+          ? `Choisis si tu veux garder le visuel de la formule selectionnee ou revenir au logo principal de ${baseProviderName}.`
+          : `Choose whether to keep the selected plan visual or go back to the main logo for ${baseProviderName}.`,
+      selected: isFrench ? "Selectionne" : "Selected",
+      choose: isFrench ? "Choisir" : "Choose",
+      quickCategories: isFrench ? "Categories rapides" : "Quick categories",
+      chosenCategory: isFrench ? "Categorie choisie" : "Selected category",
+      serviceLabel: isFrench ? "Service" : "Service",
+      suggestedReminder: isFrench ? "Rappel conseille" : "Suggested reminder",
+      price: isFrench ? "Prix" : "Price",
+      category: isFrench ? "Categorie" : "Category",
+      chosenOnPreviousStep: isFrench ? "Choisie a l'etape precedente" : "Chosen in the previous step",
+      frequency: isFrench ? "Frequence" : "Frequency",
+      freeTrial: isFrench ? "Essai gratuit" : "Free trial",
+      freeTrialHint: isFrench
+        ? "Active cette option si l'abonnement commence par une periode d'essai sans paiement."
+        : "Enable this if the subscription starts with a free trial period.",
+      trialEndsAt: isFrench ? "Fin de l'essai gratuit" : "Free trial ends",
+      firstPaymentAfterTrial: isFrench ? "Premier paiement apres essai" : "First payment after trial",
+      nextBillingDate: isFrench ? "Prochaine facturation" : "Next billing date",
+      reminderDays: isFrench ? "Rappel (jours avant)" : "Reminder (days before)",
+      sameDay: isFrench ? "Jour J" : "Same day",
+      simpleReminder: isFrench ? "Rappel simple" : "Simple reminder",
+      simpleReminderHint: isFrench
+        ? "Le rappel personnalise par abonnement est reserve au Premium."
+        : "Custom reminder timing per subscription is reserved for Premium.",
+      premiumEyebrow: "Premium",
+      premiumReminderTitle: isFrench ? "Rappels personnalises" : "Custom reminders",
+      premiumReminderBody: isFrench
+        ? "Choisis un delai de rappel pour chaque abonnement au lieu d'utiliser le rappel simple du compte."
+        : "Choose a reminder delay for each subscription instead of using the account simple reminder.",
+      premiumCta: isFrench ? "Voir le Premium" : "View Premium",
+      amount: isFrench ? "Montant" : "Amount",
+      toDefine: isFrench ? "A definir" : "To define",
+      includedServices: isFrench ? "Services inclus" : "Included services",
+      includedServicesHintUnlimited: isFrench
+        ? "Associe ici autant de services que tu veux. Exemple : NordVPN ou Uber Eats inclus dans Revolut."
+        : "Link as many services as you want here. Example: NordVPN or Uber Eats included in Revolut.",
+      includedServicesHintFree: (limit: number) =>
+        isFrench
+          ? `Associe jusqu'a ${limit} services inclus sur le plan gratuit. Exemple : NordVPN ou Uber Eats inclus dans Revolut.`
+          : `Link up to ${limit} included services on the free plan. Example: NordVPN or Uber Eats included in Revolut.`,
+      includedServicesCountUnlimited: (count: number) =>
+        isFrench
+          ? `${count} service(s) inclus selectionne(s) - illimite avec Premium.`
+          : `${count} included service(s) selected - unlimited with Premium.`,
+      includedServicesCountFree: (count: number, limit: number) =>
+        isFrench
+          ? `${count}/${limit} service(s) inclus selectionne(s) sur ton plan gratuit.`
+          : `${count}/${limit} included service(s) selected on your free plan.`,
+      searchIncludedService: isFrench ? "Rechercher un service inclus" : "Search an included service",
+      noIncludedService: isFrench
+        ? "Aucun service inclus associe pour le moment."
+        : "No included service linked yet.",
+      add: isFrench ? "Ajouter" : "Add",
+      noIncludedMatch: isFrench
+        ? "Aucun service du catalogue ne correspond a cette recherche."
+        : "No catalog service matches this search.",
+      notes: isFrench ? "Notes" : "Notes",
+      notesPlaceholder: isFrench
+        ? "Ex: formule duo, usage perso, engagement annuel"
+        : "Ex: duo plan, personal use, yearly commitment",
+      servicePlaceholder: isFrench
+        ? "Ex: Prime Video, Revolut, Apple One"
+        : "Ex: Prime Video, Revolut, Apple One",
+      datePlaceholder: "25/03/2026",
+      includedSearchPlaceholder: isFrench ? "Rechercher un service inclus" : "Search an included service",
+      back: isFrench ? "Retour" : "Back",
+      continue: isFrench ? "Continuer" : "Continue",
+      saving: isFrench ? "Enregistrement..." : "Saving...",
+      saveSubscription: isFrench ? "Enregistrer l'abonnement" : "Save subscription"
+    }),
+    [isFrench, profile?.currency]
+  );
 
   const selectedPreset = useMemo(() => {
     if (selectedPresetId) {
@@ -192,7 +388,7 @@ export function AddSubscriptionScreen(): JSX.Element {
     const availableSlugs = new Set(POPULAR_SERVICE_PRESETS.map((preset) => preset.categorySlug));
 
     return [
-      { id: "all", label: "Tous" },
+      { id: "all", label: copy.all },
       ...PREDEFINED_CATEGORY_PRESETS.filter((preset) => availableSlugs.has(preset.slug)).map(
         (preset) => ({
           id: preset.slug,
@@ -200,7 +396,7 @@ export function AddSubscriptionScreen(): JSX.Element {
         })
       )
     ];
-  }, []);
+  }, [copy.all]);
 
   const includedServiceDirectory = useMemo(() => {
     const seen = new Set<string>();
@@ -414,8 +610,8 @@ export function AddSubscriptionScreen(): JSX.Element {
 
     if (includedProviderNames.length >= includedServiceLimit) {
       Alert.alert(
-        "Limite atteinte",
-        `Le plan gratuit permet jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus par abonnement. Passe au Premium pour en ajouter autant que tu veux.`
+        copy.limitReachedTitle,
+        copy.limitReachedBody(FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION)
       );
       return;
     }
@@ -440,10 +636,7 @@ export function AddSubscriptionScreen(): JSX.Element {
 
   const validateServiceStep = () => {
     if (!providerName.trim() || !category.trim()) {
-      Alert.alert(
-        "Informations manquantes",
-        "Choisis d'abord le service et la categorie a suivre."
-      );
+      Alert.alert(copy.missingInfoTitle, copy.missingInfoBody);
       return false;
     }
 
@@ -457,32 +650,32 @@ export function AddSubscriptionScreen(): JSX.Element {
       : Number(accountDefaultReminderDays);
 
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      Alert.alert("Prix invalide", "Entre un montant superieur a zero.");
+      Alert.alert(copy.invalidPriceTitle, copy.invalidPriceBody);
       return false;
     }
 
     if (!nextBillingDate.trim()) {
-      Alert.alert("Date manquante", "Ajoute la prochaine date de facturation.");
+      Alert.alert(copy.missingDateTitle, copy.missingDateBody);
       return false;
     }
 
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(nextBillingDate.trim())) {
-      Alert.alert("Date invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      Alert.alert(copy.invalidDateTitle, copy.invalidDateBody);
       return false;
     }
 
     if (!Number.isFinite(parsedReminderDays) || parsedReminderDays < 0) {
-      Alert.alert("Rappel invalide", "Le nombre de jours doit etre positif.");
+      Alert.alert(copy.invalidReminderTitle, copy.invalidReminderBody);
       return false;
     }
 
     if (hasFreeTrial && !trialEndsAt.trim()) {
-      Alert.alert("Essai gratuit incomplet", "Indique la date de fin de l'essai gratuit.");
+      Alert.alert(copy.incompleteTrialTitle, copy.incompleteTrialBody);
       return false;
     }
 
     if (hasFreeTrial && !/^\d{2}\/\d{2}\/\d{4}$/.test(trialEndsAt.trim())) {
-      Alert.alert("Date d'essai invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      Alert.alert(copy.invalidTrialDateTitle, copy.invalidDateBody);
       return false;
     }
 
@@ -494,8 +687,8 @@ export function AddSubscriptionScreen(): JSX.Element {
       return;
     }
 
-    const currentIndex = COMPOSER_STEPS.findIndex((step) => step.id === composerStep);
-    const nextIndex = COMPOSER_STEPS.findIndex((step) => step.id === nextStep);
+    const currentIndex = composerSteps.findIndex((step) => step.id === composerStep);
+    const nextIndex = composerSteps.findIndex((step) => step.id === nextStep);
 
     if (nextIndex < currentIndex) {
       setComposerStep(nextStep);
@@ -542,40 +735,37 @@ export function AddSubscriptionScreen(): JSX.Element {
     let trialEndIso: string | null = null;
 
     if (!providerName.trim() || !category.trim() || !nextBillingDate.trim()) {
-      Alert.alert("Champs incomplets", "Renseigne le service, la categorie et la date.");
+      Alert.alert(copy.incompleteFieldsTitle, copy.incompleteFieldsBody);
       return;
     }
 
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(nextBillingDate.trim())) {
-      Alert.alert("Date invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      Alert.alert(copy.invalidDateTitle, copy.invalidDateBody);
       return;
     }
 
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      Alert.alert("Prix invalide", "Entre un montant superieur a zero.");
+      Alert.alert(copy.invalidPriceTitle, copy.invalidPriceBody);
       return;
     }
 
     if (!Number.isFinite(parsedReminderDays) || parsedReminderDays < 0) {
-      Alert.alert("Rappel invalide", "Le nombre de jours doit etre positif.");
+      Alert.alert(copy.invalidReminderTitle, copy.invalidReminderBody);
       return;
     }
 
     if (hasFreeTrial && !trimmedTrialEndDate) {
-      Alert.alert("Essai gratuit incomplet", "Indique la date de fin de l'essai gratuit.");
+      Alert.alert(copy.incompleteTrialTitle, copy.incompleteTrialBody);
       return;
     }
 
     if (hasFreeTrial && !/^\d{2}\/\d{2}\/\d{4}$/.test(trimmedTrialEndDate)) {
-      Alert.alert("Date d'essai invalide", "Utilise le format europeen JJ/MM/AAAA.");
+      Alert.alert(copy.invalidTrialDateTitle, copy.invalidDateBody);
       return;
     }
 
     if (includedProviderNames.length > includedServiceLimit) {
-      Alert.alert(
-        "Trop de services inclus",
-        `Le plan gratuit permet jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus par abonnement. Passe au Premium pour supprimer cette limite.`
-      );
+      Alert.alert(copy.tooManyIncludedTitle, copy.tooManyIncludedBody(FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION));
       return;
     }
 
@@ -586,17 +776,14 @@ export function AddSubscriptionScreen(): JSX.Element {
         trialEndIso = toIsoDate(trimmedTrialEndDate);
 
         if (new Date(nextBillingIso).getTime() < new Date(trialEndIso).getTime()) {
-          Alert.alert(
-            "Dates incoherentes",
-            "Le premier paiement doit etre le meme jour ou apres la fin de l'essai gratuit."
-          );
+          Alert.alert(copy.inconsistentDatesTitle, copy.inconsistentDatesBody);
           return;
         }
       }
     } catch (error) {
       Alert.alert(
-        "Date invalide",
-        error instanceof Error ? error.message : "Verifie les dates saisies."
+        copy.invalidDateTitle,
+        error instanceof Error ? error.message : copy.verifyDatesBody
       );
       return;
     }
@@ -629,16 +816,14 @@ export function AddSubscriptionScreen(): JSX.Element {
       );
 
       Alert.alert(
-        isEditing ? "Abonnement mis a jour" : "Abonnement ajoute",
-        isEditing
-          ? "Les modifications ont bien ete enregistrees."
-          : "Le nouvel abonnement a ete ajoute a ton espace Subly."
+        isEditing ? copy.updatedTitle : copy.addedTitle,
+        isEditing ? copy.updatedBody : copy.addedBody
       );
       navigation.goBack();
     } catch (error) {
       Alert.alert(
-        "Enregistrement impossible",
-        error instanceof Error ? error.message : "Merci de reessayer."
+        copy.saveFailedTitle,
+        error instanceof Error ? error.message : copy.saveFailedBody
       );
     }
   };
@@ -661,7 +846,7 @@ export function AddSubscriptionScreen(): JSX.Element {
             <Text style={styles.circleButtonLabel}>{"<"}</Text>
           </Pressable>
           <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>
-            {isEditing ? "Modifier un abonnement" : "Ajouter un abonnement"}
+            {isEditing ? copy.editTitle : copy.addTitle}
           </Text>
           <Pressable
             onPress={openCustomComposer}
@@ -680,7 +865,7 @@ export function AddSubscriptionScreen(): JSX.Element {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Streaming, musique, jeux et plus encore..."
+            placeholder={copy.searchPlaceholder}
             placeholderTextColor={theme.colors.textTertiary}
           />
         </View>
@@ -712,22 +897,17 @@ export function AddSubscriptionScreen(): JSX.Element {
         </ScrollView>
 
         <View style={styles.helperCard}>
-          <Text style={styles.helperTitle}>Catalogue Subly</Text>
+          <Text style={styles.helperTitle}>{copy.helperTitle}</Text>
           <Text style={styles.helperBody}>
-            Choisis un service pour ouvrir une creation guidee en trois etapes. Le rappel
-            par defaut de ton compte est actuellement regle sur{" "}
-            {formatReminderDays(Number(accountDefaultReminderDays)).toLowerCase()}.
+            {copy.helperBody(formatReminderDays(Number(accountDefaultReminderDays)))}
           </Text>
         </View>
 
         <View style={styles.sectionStack}>
           {filteredSections.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Aucun service trouve</Text>
-              <Text style={styles.emptyBody}>
-                Essaie une autre recherche ou cree directement un abonnement
-                personnalise.
-              </Text>
+              <Text style={styles.emptyTitle}>{copy.emptyTitle}</Text>
+              <Text style={styles.emptyBody}>{copy.emptyBody}</Text>
             </View>
           ) : null}
 
@@ -758,11 +938,8 @@ export function AddSubscriptionScreen(): JSX.Element {
             <Text style={styles.customCardBadgeLabel}>+</Text>
           </View>
           <View style={styles.customCardText}>
-            <Text style={styles.customCardTitle}>Abonnement personnalise</Text>
-            <Text style={styles.customCardBody}>
-              Tu ne trouves pas ton service ? Cree une fiche libre avec le nom et la
-              categorie de ton choix.
-            </Text>
+            <Text style={styles.customCardTitle}>{copy.customCardTitle}</Text>
+            <Text style={styles.customCardBody}>{copy.customCardBody}</Text>
           </View>
         </Pressable>
       </ScrollView>
@@ -796,10 +973,10 @@ export function AddSubscriptionScreen(): JSX.Element {
                   />
                   <View style={styles.sheetIdentityText}>
                     <Text style={styles.sheetTitle}>
-                      {providerName || "Abonnement personnalise"}
+                      {providerName || copy.customSheetTitle}
                     </Text>
                     <Text style={styles.sheetSubtitle}>
-                      {selectedPreset ? selectedPreset.categoryName : "Service libre"}
+                      {selectedPreset ? selectedPreset.categoryName : copy.freeService}
                     </Text>
                   </View>
                 </View>
@@ -811,27 +988,22 @@ export function AddSubscriptionScreen(): JSX.Element {
               {selectedPreset ? (
                 <View style={styles.presetHintCard}>
                   <Text style={styles.presetHintTitle}>
-                    {selectedServicePlanPreset?.preselectedTitle ?? "Service preselectionne"}
+                    {selectedServicePlanPreset?.preselectedTitle ?? copy.selectedServiceHint}
                   </Text>
                   <Text style={styles.presetHintBody}>
                     {selectedServicePlanPreset?.preselectedDescription ??
-                      `Prix laisse vide volontairement. Tarif indicatif : ${formatCurrency(
-                          selectedPreset.suggestedPrice,
-                          profile?.currency ?? "EUR"
-                        )}.`}
+                      copy.selectedServiceBody(selectedPreset.suggestedPrice)}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.presetHintCard}>
-                  <Text style={styles.presetHintTitle}>Mode personnalise</Text>
-                  <Text style={styles.presetHintBody}>
-                    Tu peux creer un abonnement qui n'est pas dans le catalogue.
-                  </Text>
+                  <Text style={styles.presetHintTitle}>{copy.customModeTitle}</Text>
+                  <Text style={styles.presetHintBody}>{copy.customModeBody}</Text>
                 </View>
               )}
 
               <View style={styles.stepperRow}>
-                {COMPOSER_STEPS.map((step) => {
+                {composerSteps.map((step) => {
                   const isActive = composerStep === step.id;
                   const isCompleted =
                     (step.id === "service" && composerStep !== "service") ||
@@ -853,7 +1025,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                           isActive ? styles.stepperEyebrowActive : null
                         ]}
                       >
-                        {isCompleted ? "OK" : step.eyebrow}
+                        {isCompleted ? copy.stepDone : step.eyebrow}
                       </Text>
                       <Text
                         style={[
@@ -875,17 +1047,14 @@ export function AddSubscriptionScreen(): JSX.Element {
                 {composerStep === "service" ? (
                   <>
                     <View style={styles.stepInfoCard}>
-                      <Text style={styles.stepInfoTitle}>Etape 1</Text>
-                      <Text style={styles.stepInfoBody}>
-                        Choisis le service suivi, la formule si besoin, puis la categorie qui
-                        alimentera les listes et les statistiques.
-                      </Text>
+                      <Text style={styles.stepInfoTitle}>{copy.step1Title}</Text>
+                      <Text style={styles.stepInfoBody}>{copy.step1Body}</Text>
                     </View>
 
                     {selectedServicePlanPreset ? (
                       <>
                         <View style={styles.field}>
-                          <Text style={styles.label}>Nom du service</Text>
+                          <Text style={styles.label}>{copy.serviceName}</Text>
                           <View style={styles.lockedInput}>
                             <Text style={styles.lockedInputValue}>
                               {selectedServicePlanPreset.baseProviderName}
@@ -923,7 +1092,9 @@ export function AddSubscriptionScreen(): JSX.Element {
                                             </Text>
                                             <Text style={styles.passOptionBody}>
                                               {section.description ??
-                                                "Visuel officiel adapte a cette formule."}
+                                                (isFrench
+                                                  ? "Visuel officiel adapte a cette formule."
+                                                  : "Official visual adapted to this plan.")}
                                             </Text>
                                           </View>
                                         </View>
@@ -933,7 +1104,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                                             isActive ? styles.passOptionStatusActive : null
                                           ]}
                                         >
-                                          {isActive ? "Selectionne" : "Choisir"}
+                                          {isActive ? copy.selected : copy.choose}
                                         </Text>
                                       </Pressable>
                                     );
@@ -945,13 +1116,12 @@ export function AddSubscriptionScreen(): JSX.Element {
                         </View>
 
                         <View style={styles.field}>
-                          <Text style={styles.label}>Logo affiche</Text>
+                          <Text style={styles.label}>{copy.displayedLogo}</Text>
                           <Text style={styles.fieldHint}>
-                            Choisis si tu veux garder le visuel de la formule selectionnee ou
-                            revenir au logo principal de {selectedServicePlanPreset.baseProviderName}.
+                            {copy.displayedLogoHint(selectedServicePlanPreset.baseProviderName)}
                           </Text>
                           <View style={styles.logoModeStack}>
-                            {LOGO_MODE_OPTIONS.map((option) => {
+                            {logoModeOptions.map((option) => {
                               const isActive = option.value === logoMode;
 
                               return (
@@ -973,7 +1143,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                                       isActive ? styles.passOptionStatusActive : null
                                     ]}
                                   >
-                                    {isActive ? "Selectionne" : "Choisir"}
+                                    {isActive ? copy.selected : copy.choose}
                                   </Text>
                                 </Pressable>
                               );
@@ -983,13 +1153,13 @@ export function AddSubscriptionScreen(): JSX.Element {
                       </>
                     ) : (
                       <Field
-                        label="Nom du service"
+                        label={copy.serviceName}
                         value={providerName}
                         onChangeText={(value) => {
                           setSelectedPresetId(null);
                           setProviderName(value);
                         }}
-                        placeholder="Ex: Prime Video, Revolut, Apple One"
+                        placeholder={copy.servicePlaceholder}
                       />
                     )}
                   </>
@@ -997,7 +1167,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                 {composerStep === "service" ? (
                   <>
                     <View style={styles.field}>
-                      <Text style={styles.label}>Categories rapides</Text>
+                      <Text style={styles.label}>{copy.quickCategories}</Text>
                       <View style={styles.categoryWrap}>
                         {PREDEFINED_CATEGORY_PRESETS.map((preset) => {
                           const isActive = preset.name === category;
@@ -1025,7 +1195,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                     </View>
 
                     <View style={styles.stepSummaryCard}>
-                      <Text style={styles.stepSummaryLabel}>Categorie choisie</Text>
+                      <Text style={styles.stepSummaryLabel}>{copy.chosenCategory}</Text>
                       <Text style={styles.stepSummaryValue}>{category}</Text>
                     </View>
                   </>
@@ -1034,19 +1204,17 @@ export function AddSubscriptionScreen(): JSX.Element {
                 {composerStep === "billing" ? (
                   <>
                     <View style={styles.stepInfoCard}>
-                      <Text style={styles.stepInfoTitle}>Etape 2</Text>
-                      <Text style={styles.stepInfoBody}>
-                        Definis le prix, la frequence, la date cle et le rappel de paiement.
-                      </Text>
+                      <Text style={styles.stepInfoTitle}>{copy.step2Title}</Text>
+                      <Text style={styles.stepInfoBody}>{copy.step2Body}</Text>
                     </View>
 
                     <View style={styles.stepSummaryGrid}>
                       <View style={styles.stepSummaryGridCard}>
-                        <Text style={styles.stepSummaryLabel}>Service</Text>
-                        <Text style={styles.stepSummaryValue}>{providerName || "A definir"}</Text>
+                        <Text style={styles.stepSummaryLabel}>{copy.serviceLabel}</Text>
+                        <Text style={styles.stepSummaryValue}>{providerName || copy.toDefine}</Text>
                       </View>
                       <View style={styles.stepSummaryGridCard}>
-                        <Text style={styles.stepSummaryLabel}>Rappel conseille</Text>
+                        <Text style={styles.stepSummaryLabel}>{copy.suggestedReminder}</Text>
                         <Text style={styles.stepSummaryValue}>
                           {formatReminderDays(Number(accountDefaultReminderDays))}
                         </Text>
@@ -1055,7 +1223,7 @@ export function AddSubscriptionScreen(): JSX.Element {
 
                     <View style={[styles.duoRow, isCompact ? styles.duoRowCompact : null]}>
                       <Field
-                        label="Prix"
+                        label={copy.price}
                         value={price}
                         onChangeText={setPrice}
                         keyboardType="decimal-pad"
@@ -1063,10 +1231,10 @@ export function AddSubscriptionScreen(): JSX.Element {
                         inputRef={priceInputRef}
                       />
                       <View style={styles.field}>
-                        <Text style={styles.label}>Categorie</Text>
+                        <Text style={styles.label}>{copy.category}</Text>
                         <View style={styles.lockedInput}>
                           <Text style={styles.lockedInputValue}>{category}</Text>
-                          <Text style={styles.lockedInputHint}>Choisie a l'etape precedente</Text>
+                          <Text style={styles.lockedInputHint}>{copy.chosenOnPreviousStep}</Text>
                         </View>
                       </View>
                     </View>
@@ -1076,9 +1244,9 @@ export function AddSubscriptionScreen(): JSX.Element {
                 {composerStep === "billing" ? (
                   <>
                     <View style={styles.field}>
-                      <Text style={styles.label}>Frequence</Text>
+                      <Text style={styles.label}>{copy.frequency}</Text>
                       <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
-                        {FREQUENCY_OPTIONS.map((option) => (
+                        {frequencyOptions.map((option) => (
                           <Pressable
                             key={option.value}
                             onPress={() => {
@@ -1107,9 +1275,9 @@ export function AddSubscriptionScreen(): JSX.Element {
                     </View>
 
                     <View style={styles.field}>
-                      <Text style={styles.label}>Essai gratuit</Text>
+                      <Text style={styles.label}>{copy.freeTrial}</Text>
                       <View style={[styles.frequencyRow, isCompact ? styles.frequencyRowCompact : null]}>
-                        {TRIAL_OPTIONS.map((option) => {
+                        {trialOptions.map((option) => {
                           const isActive =
                             (hasFreeTrial && option.value === "active") ||
                             (!hasFreeTrial && option.value === "inactive");
@@ -1147,31 +1315,28 @@ export function AddSubscriptionScreen(): JSX.Element {
                           );
                         })}
                       </View>
-                      <Text style={styles.fieldHint}>
-                        Active cette option si l'abonnement commence par une periode d'essai sans
-                        paiement.
-                      </Text>
+                      <Text style={styles.fieldHint}>{copy.freeTrialHint}</Text>
                     </View>
 
                     {hasFreeTrial ? (
                       <DateField
-                        label="Fin de l'essai gratuit"
+                        label={copy.trialEndsAt}
                         value={trialEndsAt}
                         onChangeText={setTrialEndsAt}
-                        placeholder="25/03/2026"
+                        placeholder={copy.datePlaceholder}
                       />
                     ) : null}
 
                     <DateField
-                      label={hasFreeTrial ? "Premier paiement apres essai" : "Prochaine facturation"}
+                      label={hasFreeTrial ? copy.firstPaymentAfterTrial : copy.nextBillingDate}
                       value={nextBillingDate}
                       onChangeText={setNextBillingDate}
-                      placeholder="25/03/2026"
+                      placeholder={copy.datePlaceholder}
                     />
                     {isPremium ? (
                       <>
                         <Field
-                          label="Rappel (jours avant)"
+                          label={copy.reminderDays}
                           value={reminderDaysBefore}
                           onChangeText={setReminderDaysBefore}
                           keyboardType="decimal-pad"
@@ -1196,8 +1361,8 @@ export function AddSubscriptionScreen(): JSX.Element {
                                     styles.inlineOptionLabel,
                                     isActive ? styles.inlineOptionLabelActive : null
                                   ]}
-                                >
-                                  {value === 0 ? "Jour J" : `${value}j`}
+                                  >
+                                  {value === 0 ? copy.sameDay : `${value}j`}
                                 </Text>
                               </Pressable>
                             );
@@ -1207,21 +1372,19 @@ export function AddSubscriptionScreen(): JSX.Element {
                     ) : (
                       <>
                         <View style={styles.field}>
-                          <Text style={styles.label}>Rappel simple</Text>
+                          <Text style={styles.label}>{copy.simpleReminder}</Text>
                           <View style={styles.lockedInput}>
                             <Text style={styles.lockedInputValue}>
                               {formatReminderDays(Number(accountDefaultReminderDays))}
                             </Text>
-                            <Text style={styles.lockedInputHint}>
-                              Le rappel personnalise par abonnement est reserve au Premium.
-                            </Text>
+                            <Text style={styles.lockedInputHint}>{copy.simpleReminderHint}</Text>
                           </View>
                         </View>
                         <PromoCard
-                          eyebrow="Premium"
-                          title="Rappels personnalises"
-                          body="Choisis un delai de rappel pour chaque abonnement au lieu d'utiliser le rappel simple du compte."
-                          ctaLabel="Voir le Premium"
+                          eyebrow={copy.premiumEyebrow}
+                          title={copy.premiumReminderTitle}
+                          body={copy.premiumReminderBody}
+                          ctaLabel={copy.premiumCta}
                           onPress={() => navigation.navigate("Profile")}
                           tone="purple"
                         />
@@ -1232,44 +1395,45 @@ export function AddSubscriptionScreen(): JSX.Element {
                 {composerStep === "options" ? (
                   <>
                     <View style={styles.stepInfoCard}>
-                      <Text style={styles.stepInfoTitle}>Etape 3</Text>
-                      <Text style={styles.stepInfoBody}>
-                        Termine avec les services inclus et les notes qui aideront pour le suivi.
-                      </Text>
+                      <Text style={styles.stepInfoTitle}>{copy.step3Title}</Text>
+                      <Text style={styles.stepInfoBody}>{copy.step3Body}</Text>
                     </View>
 
                     <View style={styles.stepSummaryGrid}>
                       <View style={styles.stepSummaryGridCard}>
-                        <Text style={styles.stepSummaryLabel}>Montant</Text>
+                        <Text style={styles.stepSummaryLabel}>{copy.amount}</Text>
                         <Text style={styles.stepSummaryValue}>
-                          {price.trim() ? `${price} ${profile?.currency ?? "EUR"}` : "A definir"}
+                          {price.trim() ? `${price} ${profile?.currency ?? "EUR"}` : copy.toDefine}
                         </Text>
                       </View>
                       <View style={styles.stepSummaryGridCard}>
-                        <Text style={styles.stepSummaryLabel}>Frequence</Text>
+                        <Text style={styles.stepSummaryLabel}>{copy.frequency}</Text>
                         <Text style={styles.stepSummaryValue}>
-                          {FREQUENCY_OPTIONS.find((option) => option.value === frequency)?.label}
+                          {frequencyOptions.find((option) => option.value === frequency)?.label}
                         </Text>
                       </View>
                     </View>
 
                     <View style={styles.field}>
-                      <Text style={styles.label}>Services inclus</Text>
+                      <Text style={styles.label}>{copy.includedServices}</Text>
                       <Text style={styles.fieldHint}>
                         {hasUnlimitedIncludedServices
-                          ? "Associe ici autant de services que tu veux. Exemple : NordVPN ou Uber Eats inclus dans Revolut."
-                          : `Associe jusqu'a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} services inclus sur le plan gratuit. Exemple : NordVPN ou Uber Eats inclus dans Revolut.`}
+                          ? copy.includedServicesHintUnlimited
+                          : copy.includedServicesHintFree(FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION)}
                       </Text>
                       <Text style={styles.fieldHint}>
                         {hasUnlimitedIncludedServices
-                          ? `${includedProviderNames.length} service(s) inclus selectionne(s) - illimite avec Premium.`
-                          : `${includedProviderNames.length}/${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} service(s) inclus selectionne(s) sur ton plan gratuit.`}
+                          ? copy.includedServicesCountUnlimited(includedProviderNames.length)
+                          : copy.includedServicesCountFree(
+                              includedProviderNames.length,
+                              FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION
+                            )}
                       </Text>
                       <TextInput
                         style={styles.input}
                         value={includedServiceQuery}
                         onChangeText={setIncludedServiceQuery}
-                        placeholder="Rechercher un service inclus"
+                        placeholder={copy.includedSearchPlaceholder}
                         placeholderTextColor={theme.colors.textSecondary}
                       />
                       {includedProviderNames.length > 0 ? (
@@ -1288,9 +1452,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                         </View>
                       ) : (
                         <View style={styles.emptyIncludedState}>
-                          <Text style={styles.emptyIncludedStateText}>
-                            Aucun service inclus associe pour le moment.
-                          </Text>
+                          <Text style={styles.emptyIncludedStateText}>{copy.noIncludedService}</Text>
                         </View>
                       )}
                       {includedServiceSuggestions.length > 0 ? (
@@ -1305,22 +1467,20 @@ export function AddSubscriptionScreen(): JSX.Element {
                                 <ServiceLogo providerName={suggestion} size={36} />
                                 <Text style={styles.includedSuggestionLabel}>{suggestion}</Text>
                               </View>
-                              <Text style={styles.includedSuggestionAction}>Ajouter</Text>
+                              <Text style={styles.includedSuggestionAction}>{copy.add}</Text>
                             </Pressable>
                           ))}
                         </View>
                       ) : includedServiceQuery.trim() ? (
-                        <Text style={styles.fieldHint}>
-                          Aucun service du catalogue ne correspond a cette recherche.
-                        </Text>
+                        <Text style={styles.fieldHint}>{copy.noIncludedMatch}</Text>
                       ) : null}
                     </View>
 
                     <Field
-                      label="Notes"
+                      label={copy.notes}
                       value={notes}
                       onChangeText={setNotes}
-                      placeholder="Ex: formule duo, usage perso, engagement annuel"
+                      placeholder={copy.notesPlaceholder}
                       multiline
                     />
                   </>
@@ -1330,7 +1490,7 @@ export function AddSubscriptionScreen(): JSX.Element {
                   {composerStep !== "service" ? (
                     <View style={styles.stepActionButton}>
                       <PrimaryButton
-                        title="Retour"
+                        title={copy.back}
                         onPress={() =>
                           setComposerStep((current) =>
                             current === "options" ? "billing" : "service"
@@ -1345,9 +1505,9 @@ export function AddSubscriptionScreen(): JSX.Element {
                       title={
                         composerStep === "options"
                           ? isSaving
-                            ? "Enregistrement..."
-                            : "Enregistrer l'abonnement"
-                          : "Continuer"
+                            ? copy.saving
+                            : copy.saveSubscription
+                          : copy.continue
                       }
                       onPress={() =>
                         composerStep === "options"

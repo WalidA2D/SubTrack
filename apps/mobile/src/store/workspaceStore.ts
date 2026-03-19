@@ -242,6 +242,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           ...(payload.colorBlindMode !== undefined
             ? { colorBlindMode: payload.colorBlindMode }
             : {}),
+          ...(payload.fcmTokens !== undefined ? { fcmTokens: payload.fcmTokens } : {}),
           ...(payload.notificationPreferences
             ? {
                 notificationPreferences: {

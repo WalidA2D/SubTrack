@@ -162,6 +162,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
+  plugins: ["expo-notifications"],
   ios: {
     bundleIdentifier: "com.subly.app",
     googleServicesFile: "./GoogleService-Info.plist",

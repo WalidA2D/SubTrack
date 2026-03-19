@@ -3,19 +3,22 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
   View,
+  ViewStyle,
   useWindowDimensions
 } from "react-native";
 
-import { BrandLogo } from "./BrandLogo";
 import { AppTheme, spacing, useAppTheme } from "../theme";
 
 type ScreenProps = PropsWithChildren<{
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  headerLayout?: "inline" | "stacked";
+  headerTextStyle?: StyleProp<ViewStyle>;
   onScrollBeginDrag?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }>;
 
@@ -23,6 +26,8 @@ export function Screen({
   title,
   subtitle,
   action,
+  headerLayout = "inline",
+  headerTextStyle,
   onScrollBeginDrag,
   children
 }: ScreenProps): JSX.Element {
@@ -51,14 +56,23 @@ export function Screen({
         showsVerticalScrollIndicator={false}
         onScrollBeginDrag={onScrollBeginDrag}
       >
-        <View style={[styles.header, isCompact ? styles.headerCompact : null]}>
-          <View style={styles.headerText}>
-            <BrandLogo compact={isCompact} />
-            <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {headerLayout === "stacked" ? (
+          <View style={styles.headerStacked}>
+            {action ? <View style={styles.headerActionTop}>{action}</View> : null}
+            <View style={[styles.headerText, headerTextStyle]}>
+              <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>{title}</Text>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            </View>
           </View>
-          {action}
-        </View>
+        ) : (
+          <View style={[styles.header, isCompact ? styles.headerCompact : null]}>
+            <View style={[styles.headerText, headerTextStyle]}>
+              <Text style={[styles.title, isCompact ? styles.titleCompact : null]}>{title}</Text>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            </View>
+            {action}
+          </View>
+        )}
         {children}
       </ScrollView>
     </View>
@@ -106,6 +120,12 @@ const createStyles = (theme: AppTheme) =>
     headerCompact: {
       flexDirection: "column",
       alignItems: "stretch"
+    },
+    headerStacked: {
+      gap: spacing.md
+    },
+    headerActionTop: {
+      alignSelf: "flex-end"
     },
     headerText: {
       flex: 1,

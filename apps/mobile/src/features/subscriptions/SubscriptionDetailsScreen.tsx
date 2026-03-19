@@ -2,6 +2,7 @@ import { Alert, StyleSheet, Text, View, useWindowDimensions } from "react-native
 
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
+import { useAppTranslation } from "../../i18n";
 import { ServiceLogo } from "../../components/ServiceLogo";
 import { useAppNavigation, useCurrentOverlayRoute } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
@@ -23,6 +24,8 @@ export function SubscriptionDetailsScreen(): JSX.Element {
   const navigation = useAppNavigation();
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const route = useCurrentOverlayRoute();
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const archiveSubscription = useWorkspaceStore((state) => state.archiveSubscription);
@@ -35,16 +38,55 @@ export function SubscriptionDetailsScreen(): JSX.Element {
   const linkedParentSubscriptions = subscription
     ? getLinkedParentSubscriptions(subscription, subscriptions)
     : [];
+  const copy = {
+    notFoundTitle: isFrench ? "Abonnement introuvable" : "Subscription not found",
+    notFoundSubtitle: isFrench
+      ? "Reviens a la liste pour recharger les donnees."
+      : "Go back to the list to reload the data.",
+    back: isFrench ? "Retour" : "Back",
+    notFoundBody: isFrench
+      ? "L'abonnement selectionne n'est plus disponible."
+      : "The selected subscription is no longer available.",
+    archiveTitle: isFrench ? "Archiver l'abonnement ?" : "Archive subscription?",
+    archiveBody: isFrench
+      ? "Il disparaitra de la liste active mais restera trace dans l'historique Firestore."
+      : "It will disappear from the active list but stay recorded in Firestore history.",
+    cancel: isFrench ? "Annuler" : "Cancel",
+    archive: isFrench ? "Archiver" : "Archive",
+    archiveFailed: isFrench ? "Archivage impossible" : "Unable to archive",
+    subtitle: isFrench
+      ? "Le detail de la facturation, des signaux d'usage et des actions disponibles."
+      : "Billing details, usage signals and available actions.",
+    nextCharge: isFrench ? "Prochain prelevement" : "Next charge",
+    category: isFrench ? "Categorie" : "Category",
+    status: isFrench ? "Statut" : "Status",
+    trialEnd: isFrench ? "Fin de l'essai" : "Trial end",
+    reminder: isFrench ? "Rappel" : "Reminder",
+    lastUse: isFrench ? "Derniere utilisation" : "Last usage",
+    notProvided: isFrench ? "Non renseignee" : "Not provided",
+    usage: isFrench ? "Usage" : "Usage",
+    notes: isFrench ? "Notes" : "Notes",
+    noNotes: isFrench ? "Aucune note" : "No notes",
+    linkedSubscription: isFrench ? "Abonnement lie" : "Linked subscription",
+    linkedHint: isFrench
+      ? "Cet abonnement est actuellement couvert ou rattache a :"
+      : "This subscription is currently covered or linked to:",
+    includedServices: isFrench ? "Services inclus" : "Included services",
+    includedHint: isFrench
+      ? "Ces services sont compris dans cet abonnement et peuvent faire partie de ses avantages."
+      : "These services are included in this subscription and may be part of its benefits.",
+    edit: isFrench ? "Modifier" : "Edit"
+  };
 
   if (!subscription) {
     return (
       <Screen
-        title="Abonnement introuvable"
-        subtitle="Reviens a la liste pour recharger les donnees."
-        action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
+        title={copy.notFoundTitle}
+        subtitle={copy.notFoundSubtitle}
+        action={<PrimaryButton title={copy.back} onPress={navigation.goBack} variant="secondary" />}
       >
         <View style={styles.card}>
-          <Text style={styles.rowValue}>L'abonnement selectionne n'est plus disponible.</Text>
+          <Text style={styles.rowValue}>{copy.notFoundBody}</Text>
         </View>
       </Screen>
     );
@@ -52,12 +94,12 @@ export function SubscriptionDetailsScreen(): JSX.Element {
 
   const handleArchive = () => {
     Alert.alert(
-      "Archiver l'abonnement ?",
-      "Il disparaitra de la liste active mais restera trace dans l'historique Firestore.",
+      copy.archiveTitle,
+      copy.archiveBody,
       [
-        { text: "Annuler", style: "cancel" },
+        { text: copy.cancel, style: "cancel" },
         {
-          text: "Archiver",
+          text: copy.archive,
           style: "destructive",
           onPress: async () => {
             try {
@@ -65,8 +107,8 @@ export function SubscriptionDetailsScreen(): JSX.Element {
               navigation.goBack();
             } catch (error) {
               Alert.alert(
-                "Archivage impossible",
-                error instanceof Error ? error.message : "Merci de reessayer."
+                copy.archiveFailed,
+                error instanceof Error ? error.message : (isFrench ? "Merci de reessayer." : "Please try again.")
               );
             }
           }
@@ -78,8 +120,8 @@ export function SubscriptionDetailsScreen(): JSX.Element {
   return (
     <Screen
       title={subscription.providerName}
-      subtitle="Le detail de la facturation, des signaux d'usage et des actions disponibles."
-      action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
+      subtitle={copy.subtitle}
+      action={<PrimaryButton title={copy.back} onPress={navigation.goBack} variant="secondary" />}
     >
       <View
         style={[
@@ -99,41 +141,39 @@ export function SubscriptionDetailsScreen(): JSX.Element {
           </Text>
           <Text style={styles.meta}>{formatBillingFrequency(subscription.billingFrequency)}</Text>
           <Text style={styles.meta}>
-            Prochain prelevement : {formatLongDate(subscription.nextBillingDate)}
+            {copy.nextCharge} : {formatLongDate(subscription.nextBillingDate)}
           </Text>
         </View>
       </View>
 
       <View style={styles.card}>
-        <DetailRow compact={isCompact} label="Categorie" value={subscription.categoryName} />
-        <DetailRow compact={isCompact} label="Statut" value={formatStatus(subscription.status)} />
+        <DetailRow compact={isCompact} label={copy.category} value={subscription.categoryName} />
+        <DetailRow compact={isCompact} label={copy.status} value={formatStatus(subscription.status)} />
         {subscription.trialEndsAt ? (
           <DetailRow
             compact={isCompact}
-            label="Fin de l'essai"
+            label={copy.trialEnd}
             value={formatLongDate(subscription.trialEndsAt)}
           />
         ) : null}
         <DetailRow
           compact={isCompact}
-          label="Rappel"
+          label={copy.reminder}
           value={formatReminderDays(subscription.reminderDaysBefore)}
         />
         <DetailRow
           compact={isCompact}
-          label="Derniere utilisation"
-          value={subscription.lastUsedAt ? formatLongDate(subscription.lastUsedAt) : "Non renseignee"}
+          label={copy.lastUse}
+          value={subscription.lastUsedAt ? formatLongDate(subscription.lastUsedAt) : copy.notProvided}
         />
-        <DetailRow compact={isCompact} label="Usage" value={formatUsageCheckIn(subscription.usageCheckIn)} />
-        <DetailRow compact={isCompact} label="Notes" value={subscription.notes || "Aucune note"} />
+        <DetailRow compact={isCompact} label={copy.usage} value={formatUsageCheckIn(subscription.usageCheckIn)} />
+        <DetailRow compact={isCompact} label={copy.notes} value={subscription.notes || copy.noNotes} />
       </View>
 
       {linkedParentSubscriptions.length > 0 ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Abonnement lie</Text>
-          <Text style={styles.sectionHint}>
-            Cet abonnement est actuellement couvert ou rattache a :
-          </Text>
+          <Text style={styles.sectionTitle}>{copy.linkedSubscription}</Text>
+          <Text style={styles.sectionHint}>{copy.linkedHint}</Text>
           <View style={styles.includedWrap}>
             {linkedParentSubscriptions.map((parentSubscription) => (
               <View key={parentSubscription.id} style={styles.includedChip}>
@@ -151,10 +191,8 @@ export function SubscriptionDetailsScreen(): JSX.Element {
 
       {(subscription.includedProviderNames?.length ?? 0) > 0 ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Services inclus</Text>
-          <Text style={styles.sectionHint}>
-            Ces services sont compris dans cet abonnement et peuvent faire partie de ses avantages.
-          </Text>
+          <Text style={styles.sectionTitle}>{copy.includedServices}</Text>
+          <Text style={styles.sectionHint}>{copy.includedHint}</Text>
           <View style={styles.includedWrap}>
             {(subscription.includedProviderNames ?? []).map((providerName) => (
               <View key={providerName} style={styles.includedChip}>
@@ -168,14 +206,14 @@ export function SubscriptionDetailsScreen(): JSX.Element {
 
       <View style={[styles.actions, isTablet ? styles.actionsTablet : null]}>
         <PrimaryButton
-          title="Modifier"
+          title={copy.edit}
           onPress={() =>
             navigation.navigate("AddSubscription", {
               subscriptionId: subscription.id
             })
           }
         />
-        <PrimaryButton title="Archiver" onPress={handleArchive} variant="secondary" />
+        <PrimaryButton title={copy.archive} onPress={handleArchive} variant="secondary" />
       </View>
     </Screen>
   );

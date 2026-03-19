@@ -14,6 +14,48 @@ const subscriptionsCollection = db.collection("subscriptions");
 const paymentsCollection = db.collection("payments");
 const notificationsCollection = db.collection("notifications");
 
+function buildNotificationPreferences(
+  preferences?: Record<string, unknown>
+) {
+  return {
+    notificationsEnabled:
+      typeof preferences?.notificationsEnabled === "boolean"
+        ? preferences.notificationsEnabled
+        : true,
+    paymentReminders:
+      typeof preferences?.paymentReminders === "boolean"
+        ? preferences.paymentReminders
+        : true,
+    trialReminders:
+      typeof preferences?.trialReminders === "boolean"
+        ? preferences.trialReminders
+        : true,
+    insightNotifications:
+      typeof preferences?.insightNotifications === "boolean"
+        ? preferences.insightNotifications
+        : true,
+    defaultReminderDaysBefore:
+      typeof preferences?.defaultReminderDaysBefore === "number"
+        ? preferences.defaultReminderDaysBefore
+        : 3
+  };
+}
+
+function buildFcmTokens(tokens?: unknown) {
+  if (!Array.isArray(tokens)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      tokens
+        .filter((token): token is string => typeof token === "string")
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0)
+    )
+  ).slice(-20);
+}
+
 function buildDeletionSchedule(referenceDate = new Date()) {
   const deletionRequestedAt = referenceDate.toISOString();
   const deletionScheduledForDate = new Date(referenceDate);
@@ -96,7 +138,11 @@ export const userService = {
     return {
       language: DEFAULT_LANGUAGE,
       colorBlindMode: false,
-      ...snapshot.data()
+      ...snapshot.data(),
+      notificationPreferences: buildNotificationPreferences(
+        (snapshot.data() as { notificationPreferences?: Record<string, unknown> } | undefined)
+          ?.notificationPreferences
+      )
     };
   },
 
@@ -110,21 +156,27 @@ export const userService = {
     const current = snapshot.data() as {
       language?: string;
       colorBlindMode?: boolean;
+      fcmTokens?: string[];
       notificationPreferences?: Record<string, unknown>;
     };
 
     const nextPreferences = payload.notificationPreferences
-      ? {
+      ? buildNotificationPreferences({
           ...(current.notificationPreferences ?? {}),
           ...payload.notificationPreferences
-        }
-      : current.notificationPreferences;
+        })
+      : buildNotificationPreferences(current.notificationPreferences);
+    const nextFcmTokens =
+      payload.fcmTokens !== undefined
+        ? buildFcmTokens(payload.fcmTokens)
+        : buildFcmTokens(current.fcmTokens);
 
     const nextProfile = {
       ...(payload.currency ? { currency: payload.currency } : {}),
       ...(payload.language ? { language: payload.language } : {}),
       ...(payload.planTier ? { planTier: payload.planTier } : {}),
       ...(payload.colorBlindMode !== undefined ? { colorBlindMode: payload.colorBlindMode } : {}),
+      ...(payload.fcmTokens !== undefined ? { fcmTokens: nextFcmTokens } : {}),
       ...(nextPreferences ? { notificationPreferences: nextPreferences } : {}),
       updatedAt: new Date().toISOString()
     };
@@ -140,6 +192,8 @@ export const userService = {
       language: DEFAULT_LANGUAGE,
       colorBlindMode: false,
       ...snapshot.data(),
+      fcmTokens: nextFcmTokens,
+      notificationPreferences: nextPreferences,
       ...nextProfile
     };
   },
@@ -279,6 +333,7 @@ export const userService = {
       language: DEFAULT_LANGUAGE,
       colorBlindMode: false,
       notificationPreferences: {
+        notificationsEnabled: true,
         paymentReminders: true,
         trialReminders: true,
         insightNotifications: true,

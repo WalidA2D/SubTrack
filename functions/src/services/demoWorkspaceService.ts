@@ -62,6 +62,7 @@ export async function ensureDemoWorkspace(user: DemoUser) {
         language: DEFAULT_LANGUAGE,
         colorBlindMode: false,
         notificationPreferences: {
+          notificationsEnabled: true,
           paymentReminders: true,
           trialReminders: true,
           insightNotifications: true,

@@ -105,6 +105,32 @@ export function formatInsightTitle(type: string): string {
   return translate("format.insight.default");
 }
 
+export function formatInsightMessage(insight: {
+  type: string;
+  providerName?: string;
+  count?: number;
+  message?: string;
+}): string {
+  if (insight.type === "unused_subscription" && insight.providerName) {
+    return translate("format.insightBody.unused", {
+      providerName: insight.providerName
+    });
+  }
+
+  if (
+    insight.type === "duplicate_subscription" &&
+    insight.providerName &&
+    typeof insight.count === "number"
+  ) {
+    return translate("format.insightBody.duplicate", {
+      count: insight.count,
+      providerName: insight.providerName
+    });
+  }
+
+  return insight.message || translate("format.insightBody.default");
+}
+
 export function toDateInputValue(dateString: string): string {
   const date = new Date(dateString);
 
@@ -117,6 +143,7 @@ export function toDateInputValue(dateString: string): string {
 
 export function toIsoDate(dateInput: string): string {
   const trimmedInput = dateInput.trim();
+  const isFrench = getActiveFormatLocale().startsWith("fr");
   let year: number;
   let month: number;
   let day: number;
@@ -132,7 +159,11 @@ export function toIsoDate(dateInput: string): string {
     month = Number(monthValue);
     year = Number(yearValue);
   } else {
-    throw new Error("La date doit etre au format JJ/MM/AAAA.");
+    throw new Error(
+      isFrench
+        ? "La date doit etre au format JJ/MM/AAAA."
+        : "Date must use the DD/MM/YYYY format."
+    );
   }
 
   const normalizedDate = new Date(Date.UTC(year, month - 1, day, 9, 0, 0));
@@ -142,7 +173,7 @@ export function toIsoDate(dateInput: string): string {
     normalizedDate.getUTCDate() === day;
 
   if (!isValidDate) {
-    throw new Error("La date saisie est invalide.");
+    throw new Error(isFrench ? "La date saisie est invalide." : "The entered date is invalid.");
   }
 
   return normalizedDate.toISOString();

@@ -7,20 +7,42 @@ const notificationsCollection = db.collection("notifications");
 const subscriptionsCollection = db.collection("subscriptions");
 const usersCollection = db.collection("users");
 
+type UserNotificationProfile = {
+  fcmTokens: string[];
+  notificationsEnabled: boolean;
+  paymentReminders: boolean;
+  trialReminders: boolean;
+};
+
 function buildNotificationId(type: string, subscriptionId: string, targetIso: string) {
   return `${type}_${subscriptionId}_${targetIso.slice(0, 13).replace(/[:]/g, "-")}`;
 }
 
+async function getUserNotificationProfile(userId: string): Promise<UserNotificationProfile> {
+  const userSnapshot = await usersCollection.doc(userId).get();
+  const profile = userSnapshot.data() as {
+    fcmTokens?: string[];
+    notificationPreferences?: {
+      notificationsEnabled?: boolean;
+      paymentReminders?: boolean;
+      trialReminders?: boolean;
+    };
+  } | undefined;
+
+  return {
+    fcmTokens: profile?.fcmTokens ?? [],
+    notificationsEnabled: profile?.notificationPreferences?.notificationsEnabled ?? true,
+    paymentReminders: profile?.notificationPreferences?.paymentReminders ?? true,
+    trialReminders: profile?.notificationPreferences?.trialReminders ?? true
+  };
+}
+
 async function sendPushToUser(
-  userId: string,
+  tokens: string[],
   title: string,
   body: string,
   data: Record<string, string>
 ) {
-  const userSnapshot = await usersCollection.doc(userId).get();
-  const profile = userSnapshot.data() as { fcmTokens?: string[] } | undefined;
-  const tokens = profile?.fcmTokens ?? [];
-
   if (tokens.length === 0) {
     return false;
   }
@@ -42,8 +64,21 @@ async function createAndSendNotification(
   type: "payment_due" | "trial_ending",
   scheduledFor: string,
   title: string,
-  body: string
+  body: string,
+  userProfile: UserNotificationProfile
 ) {
+  if (!userProfile.notificationsEnabled) {
+    return;
+  }
+
+  if (type === "payment_due" && !userProfile.paymentReminders) {
+    return;
+  }
+
+  if (type === "trial_ending" && !userProfile.trialReminders) {
+    return;
+  }
+
   const notificationId = buildNotificationId(type, subscription.id, scheduledFor);
   const notificationReference = notificationsCollection.doc(notificationId);
   const existing = await notificationReference.get();
@@ -52,7 +87,7 @@ async function createAndSendNotification(
     return;
   }
 
-  const delivered = await sendPushToUser(subscription.userId, title, body, {
+  const delivered = await sendPushToUser(userProfile.fcmTokens, title, body, {
     subscriptionId: subscription.id,
     type
   });
@@ -72,6 +107,18 @@ async function createAndSendNotification(
 }
 
 export async function queueUpcomingNotifications() {
+  const userProfiles = new Map<string, Promise<UserNotificationProfile>>();
+  const getCachedUserProfile = (userId: string) => {
+    const cached = userProfiles.get(userId);
+
+    if (cached) {
+      return cached;
+    }
+
+    const nextProfile = getUserNotificationProfile(userId);
+    userProfiles.set(userId, nextProfile);
+    return nextProfile;
+  };
   const nowIso = new Date().toISOString();
   const maxWindow = new Date();
   maxWindow.setDate(maxWindow.getDate() + 30);
@@ -93,6 +140,7 @@ export async function queueUpcomingNotifications() {
       subscription.nextBillingDate,
       subscription.reminderDaysBefore
     );
+    const userProfile = await getCachedUserProfile(subscription.userId);
 
     if (isWithinCurrentHour(reminderAt)) {
       await createAndSendNotification(
@@ -100,7 +148,8 @@ export async function queueUpcomingNotifications() {
         "payment_due",
         reminderAt,
         `${subscription.providerName} renews soon`,
-        `Your ${subscription.providerName} subscription will charge ${subscription.currency} ${subscription.price.toFixed(2)} on ${subscription.nextBillingDate.slice(0, 10)}.`
+        `Your ${subscription.providerName} subscription will charge ${subscription.currency} ${subscription.price.toFixed(2)} on ${subscription.nextBillingDate.slice(0, 10)}.`,
+        userProfile
       );
     }
   }
@@ -121,6 +170,7 @@ export async function queueUpcomingNotifications() {
       subscription.trialEndsAt,
       subscription.reminderDaysBefore
     );
+    const userProfile = await getCachedUserProfile(subscription.userId);
 
     if (isWithinCurrentHour(reminderAt)) {
       await createAndSendNotification(
@@ -128,7 +178,8 @@ export async function queueUpcomingNotifications() {
         "trial_ending",
         reminderAt,
         `${subscription.providerName} trial ends soon`,
-        `Your free trial for ${subscription.providerName} ends on ${subscription.trialEndsAt.slice(0, 10)}.`
+        `Your free trial for ${subscription.providerName} ends on ${subscription.trialEndsAt.slice(0, 10)}.`,
+        userProfile
       );
     }
   }

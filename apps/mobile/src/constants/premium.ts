@@ -17,7 +17,7 @@ export type PremiumComparisonRow = {
     | "annual_forecast"
     | "low_usage_detection"
     | "custom_reminders"
-    | "household_sharing"
+    | "pdf_export"
     | "ads";
   title: string;
   description: string;
@@ -49,6 +49,7 @@ export const PREMIUM_PLAN_FEATURES = [
   "Statistiques avancees",
   "Calendrier des prelevements",
   "Detection des abonnements peu utiles et des doublons",
+  "Export PDF des abonnements",
   "Rappels personnalises",
   "Sans pub"
 ] as const;
@@ -120,12 +121,11 @@ export const PREMIUM_COMPARISON_ROWS: PremiumComparisonRow[] = [
     premiumValue: "Personnalises"
   },
   {
-    id: "household_sharing",
-    title: "Partage avec un proche",
-    description: "Pilotage commun d'un foyer ou d'un duo depuis le meme espace.",
+    id: "pdf_export",
+    title: "Export PDF",
+    description: "Generer un rapport PDF propre et partageable de tes abonnements filtres.",
     freeValue: "Non inclus",
-    premiumValue: "Premium",
-    premiumState: "coming_soon"
+    premiumValue: "Rapport complet"
   },
   {
     id: "ads",

@@ -53,8 +53,10 @@ export const updateSettingsSchema = z.object({
   language: z.string().min(1).optional(),
   planTier: planTierSchema.optional(),
   colorBlindMode: z.boolean().optional(),
+  fcmTokens: z.array(z.string().min(1)).max(20).optional(),
   notificationPreferences: z
     .object({
+      notificationsEnabled: z.boolean().optional(),
       paymentReminders: z.boolean().optional(),
       trialReminders: z.boolean().optional(),
       insightNotifications: z.boolean().optional(),

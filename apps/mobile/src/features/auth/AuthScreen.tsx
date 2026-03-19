@@ -9,8 +9,9 @@ import { AppTheme, radius, spacing, useAppTheme } from "../../theme";
 
 export function AuthScreen(): JSX.Element {
   const theme = useAppTheme();
-  const { t } = useAppTranslation();
+  const { locale, t } = useAppTranslation();
   const styles = createStyles(theme);
+  const isFrench = locale === "fr";
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,20 +22,46 @@ export function AuthScreen(): JSX.Element {
   const isPasswordValid = password.length >= 8;
   const isDisplayNameValid = !isRegisterMode || displayName.trim().length >= 2;
   const canSubmit = isEmailValid && isPasswordValid && isDisplayNameValid && !isSubmitting;
+  const copy = {
+    invalidEmail: isFrench
+      ? "Renseigne une adresse email valide."
+      : "Enter a valid email address.",
+    invalidPassword: isFrench
+      ? "Le mot de passe doit contenir au moins 8 caracteres."
+      : "Password must contain at least 8 characters.",
+    invalidDisplayName: isFrench
+      ? "Ajoute un nom d'affichage d'au moins 2 caracteres."
+      : "Add a display name with at least 2 characters.",
+    resetNeedsEmail: isFrench
+      ? "Renseigne d'abord une adresse email valide."
+      : "Enter a valid email address first.",
+    helperInvalidEmail: isFrench
+      ? "Utilise une adresse email valide."
+      : "Use a valid email address.",
+    helperInvalidPassword: isFrench
+      ? "Le mot de passe doit contenir au moins 8 caracteres."
+      : "Password must contain at least 8 characters.",
+    helperInvalidDisplayName: isFrench
+      ? "Ajoute un nom visible d'au moins 2 caracteres."
+      : "Add a visible name with at least 2 characters.",
+    helperReady: isFrench
+      ? "Tes identifiants sont prets."
+      : "Your credentials are ready."
+  };
 
   const handleSubmit = async () => {
     if (!isEmailValid) {
-      Alert.alert(t("auth.loginErrorTitle"), "Renseigne une adresse email valide.");
+      Alert.alert(t("auth.loginErrorTitle"), copy.invalidEmail);
       return;
     }
 
     if (!isPasswordValid) {
-      Alert.alert(t("auth.loginErrorTitle"), "Le mot de passe doit contenir au moins 8 caracteres.");
+      Alert.alert(t("auth.loginErrorTitle"), copy.invalidPassword);
       return;
     }
 
     if (!isDisplayNameValid) {
-      Alert.alert(t("auth.loginErrorTitle"), "Ajoute un nom d'affichage d'au moins 2 caracteres.");
+      Alert.alert(t("auth.loginErrorTitle"), copy.invalidDisplayName);
       return;
     }
 
@@ -58,7 +85,7 @@ export function AuthScreen(): JSX.Element {
 
   const handleResetPassword = async () => {
     if (!isEmailValid) {
-      Alert.alert(t("auth.resetErrorTitle"), "Renseigne d'abord une adresse email valide.");
+      Alert.alert(t("auth.resetErrorTitle"), copy.resetNeedsEmail);
       return;
     }
 
@@ -121,12 +148,12 @@ export function AuthScreen(): JSX.Element {
         ) : null}
         <Text style={styles.helperText}>
           {!isEmailValid
-            ? "Utilise une adresse email valide."
+            ? copy.helperInvalidEmail
             : !isPasswordValid
-              ? "Le mot de passe doit contenir au moins 8 caracteres."
+              ? copy.helperInvalidPassword
               : isRegisterMode && !isDisplayNameValid
-                ? "Ajoute un nom visible d'au moins 2 caracteres."
-                : "Tes identifiants sont prets."}
+                ? copy.helperInvalidDisplayName
+                : copy.helperReady}
         </Text>
       </View>
 

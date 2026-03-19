@@ -24,11 +24,13 @@ import {
   PREMIUM_YEARLY_LIFETIME_OFFER_AMOUNT,
   PREMIUM_YEARLY_LIFETIME_OFFER_PRICE,
   PREMIUM_YEARLY_PRICE,
+  type PremiumComparisonRow,
   type PremiumFeatureState,
   isPremiumPlan
 } from "../../constants/premium";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { Screen } from "../../components/Screen";
+import { useAppTranslation } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import {
   DEFAULT_USER_EXPERIENCE_STATE,
@@ -53,61 +55,208 @@ type OfferPlan = {
   cta: string;
 };
 
-function buildOfferPlans(hasDiscountedYearlyPrice: boolean, hasLifetimeOfferLocked: boolean): OfferPlan[] {
+function getFreePlanFeatures(isFrench: boolean) {
+  if (isFrench) {
+    return [...FREE_PLAN_FEATURES];
+  }
+
+  return [
+    "Up to 5 active subscriptions",
+    "Up to 2 included services per subscription",
+    "Yearly budget forecast",
+    "Basic statistics",
+    "Simple reminders",
+    "Sponsored cards"
+  ] as const;
+}
+
+function getPremiumPlanFeatures(isFrench: boolean) {
+  if (isFrench) {
+    return [...PREMIUM_PLAN_FEATURES];
+  }
+
+  return [
+    "Unlimited subscriptions",
+    "Unlimited included services",
+    "Advanced statistics",
+    "Billing calendar",
+    "Low-utility and duplicate detection",
+    "Subscription PDF export",
+    "Custom reminders",
+    "Ad-free experience"
+  ] as const;
+}
+
+function getPremiumComparisonRows(isFrench: boolean): PremiumComparisonRow[] {
+  if (isFrench) {
+    return [...PREMIUM_COMPARISON_ROWS];
+  }
+
+  return [
+    {
+      id: "subscription_capacity",
+      title: "Tracking capacity",
+      description: "How many subscriptions you can manage at the same time.",
+      freeValue: "5 subscriptions",
+      premiumValue: "Unlimited"
+    },
+    {
+      id: "included_services",
+      title: "Included services",
+      description: "Services linked to a main offer such as a bundle or bank plan.",
+      freeValue: "2 per subscription",
+      premiumValue: "Unlimited"
+    },
+    {
+      id: "cloud_sync",
+      title: "Cloud sync",
+      description: "Automatically find your data on every device.",
+      freeValue: "Not included",
+      premiumValue: "Premium",
+      premiumState: "coming_soon"
+    },
+    {
+      id: "auto_backup",
+      title: "Automatic backup",
+      description: "Continuous protection of your data and quick restore.",
+      freeValue: "Not included",
+      premiumValue: "Premium",
+      premiumState: "coming_soon"
+    },
+    {
+      id: "advanced_statistics",
+      title: "Advanced statistics",
+      description: "Rankings, charts and detailed category insights.",
+      freeValue: "Simple view",
+      premiumValue: "Full"
+    },
+    {
+      id: "billing_calendar",
+      title: "Billing calendar",
+      description: "Yearly, monthly, weekly and daily views of upcoming subscriptions.",
+      freeValue: "Not included",
+      premiumValue: "Interactive"
+    },
+    {
+      id: "annual_forecast",
+      title: "Yearly budget forecast",
+      description: "Yearly projection and monthly/yearly toggle in your tracking.",
+      freeValue: "Included",
+      premiumValue: "Included"
+    },
+    {
+      id: "low_usage_detection",
+      title: "Low-utility / duplicates",
+      description: "Detection of services to watch or potentially redundant services.",
+      freeValue: "Locked",
+      premiumValue: "Included"
+    },
+    {
+      id: "custom_reminders",
+      title: "Custom reminders",
+      description: "Choose a reminder delay per subscription or for the whole account.",
+      freeValue: "Simple reminders",
+      premiumValue: "Custom"
+    },
+    {
+      id: "pdf_export",
+      title: "PDF export",
+      description: "Generate a clean, shareable PDF report of filtered subscriptions.",
+      freeValue: "Not included",
+      premiumValue: "Full report"
+    },
+    {
+      id: "ads",
+      title: "Ads",
+      description: "Sponsored cards visible on the free plan.",
+      freeValue: "Yes",
+      premiumValue: "None"
+    }
+  ];
+}
+
+function buildOfferPlans(
+  hasDiscountedYearlyPrice: boolean,
+  hasLifetimeOfferLocked: boolean,
+  isFrench: boolean
+): OfferPlan[] {
+  const freePlanFeatures = getFreePlanFeatures(isFrench);
+  const premiumPlanFeatures = getPremiumPlanFeatures(isFrench);
+  const monthlyPriceLabel = isFrench ? PREMIUM_MONTHLY_PRICE : "EUR 2.99 / month";
+  const yearlyPriceLabel = isFrench ? PREMIUM_YEARLY_PRICE : "EUR 19.99 / year";
+  const yearlyDiscountedPriceLabel = isFrench
+    ? PREMIUM_YEARLY_LIFETIME_OFFER_PRICE
+    : "EUR 9.99 / year";
+
   return [
     {
       id: "free",
-      title: "Gratuit",
-      price: "0 EUR",
-      subtitle: "Pour demarrer sans engagement",
-      features: FREE_PLAN_FEATURES.map((label) => ({ label })),
+      title: isFrench ? "Gratuit" : "Free",
+      price: isFrench ? "0 EUR" : "EUR 0",
+      subtitle: isFrench ? "Pour demarrer sans engagement" : "To get started without commitment",
+      features: freePlanFeatures.map((label) => ({ label })),
       tone: "neutral",
-      cta: "Rester gratuit"
+      cta: isFrench ? "Rester gratuit" : "Stay free"
     },
     {
       id: "premium_monthly",
       title: "Premium",
-      price: PREMIUM_MONTHLY_PRICE,
-      subtitle: "Flexible et sans engagement annuel",
+      price: monthlyPriceLabel,
+      subtitle: isFrench ? "Flexible et sans engagement annuel" : "Flexible with no yearly commitment",
       features: [
-        ...PREMIUM_PLAN_FEATURES.map((label) => ({ label })),
-        { label: "Synchronisation cloud", state: "coming_soon" },
-        { label: "Sauvegarde automatique", state: "coming_soon" },
-        { label: "Partage avec un proche", state: "coming_soon" }
+        ...premiumPlanFeatures.map((label) => ({ label })),
+        { label: isFrench ? "Synchronisation cloud" : "Cloud sync", state: "coming_soon" },
+        { label: isFrench ? "Sauvegarde automatique" : "Automatic backup", state: "coming_soon" }
       ],
-      highlight: "Le plus souple",
+      highlight: isFrench ? "Le plus souple" : "Most flexible",
       tone: "orange",
-      cta: "Choisir le mensuel"
+      cta: isFrench ? "Choisir le mensuel" : "Choose monthly"
     },
     {
       id: "premium_yearly",
-      title: "Premium annuel",
+      title: isFrench ? "Premium annuel" : "Premium yearly",
       price: hasDiscountedYearlyPrice
-        ? PREMIUM_YEARLY_LIFETIME_OFFER_PRICE
-        : PREMIUM_YEARLY_PRICE,
+        ? yearlyDiscountedPriceLabel
+        : yearlyPriceLabel,
       subtitle: hasLifetimeOfferLocked
-        ? "Ton -50% est verrouille tant que ton Premium reste actif"
+        ? isFrench
+          ? "Ton -50% est verrouille tant que ton Premium reste actif"
+          : "Your -50% price stays locked while Premium remains active"
         : hasDiscountedYearlyPrice
-          ? "Offre annuelle reservee pendant une heure"
-          : "La formule la plus rentable",
+          ? isFrench
+            ? "Offre annuelle reservee pendant une heure"
+            : "Yearly offer reserved for one hour"
+          : isFrench
+            ? "La formule la plus rentable"
+            : "The best value plan",
       features: [
-        { label: "Tout Premium" },
+        { label: isFrench ? "Tout Premium" : "Everything in Premium" },
         {
           label: hasDiscountedYearlyPrice
-            ? "Tarif annuel a -50% tant que Premium actif"
-            : "33% moins cher"
+            ? isFrench
+              ? "Tarif annuel a -50% tant que Premium actif"
+              : "Yearly price at -50% while Premium stays active"
+            : isFrench
+              ? "33% moins cher"
+              : "33% cheaper"
         },
-        { label: "Synchronisation cloud", state: "coming_soon" },
-        { label: "Sauvegarde automatique", state: "coming_soon" },
-        { label: "Partage avec un proche", state: "coming_soon" }
+        { label: isFrench ? "Synchronisation cloud" : "Cloud sync", state: "coming_soon" },
+        { label: isFrench ? "Sauvegarde automatique" : "Automatic backup", state: "coming_soon" },
+        { label: isFrench ? "Export PDF des abonnements" : "Subscription PDF export" }
       ],
       highlight: hasLifetimeOfferLocked
-        ? "Tarif verrouille"
+        ? isFrench
+          ? "Tarif verrouille"
+          : "Locked price"
         : hasDiscountedYearlyPrice
-          ? "Offre -50%"
-          : "Meilleure offre",
+          ? isFrench
+            ? "Offre -50%"
+            : "-50% offer"
+          : isFrench
+            ? "Meilleure offre"
+            : "Best offer",
       tone: "purple",
-      cta: "Choisir l'annuel"
+      cta: isFrench ? "Choisir l'annuel" : "Choose yearly"
     }
   ];
 }
@@ -116,18 +265,30 @@ function countsTowardPlanUsage(status: Subscription["status"]) {
   return status === "active" || status === "trial";
 }
 
-function getPremiumPlanLabel(subscription: Subscription | null) {
+function getPremiumPlanLabel(subscription: Subscription | null, isFrench: boolean) {
   if (!subscription) {
     return "Premium";
   }
 
   if (subscription.billingFrequency === "yearly") {
     return Math.abs(subscription.price - PREMIUM_YEARLY_LIFETIME_OFFER_AMOUNT) < 0.001
-      ? "Premium annuel -50%"
-      : "Premium annuel";
+      ? isFrench
+        ? "Premium annuel -50%"
+        : "Premium yearly -50%"
+      : isFrench
+        ? "Premium annuel"
+        : "Premium yearly";
   }
 
-  return "Premium mensuel";
+  return isFrench ? "Premium mensuel" : "Premium monthly";
+}
+
+function getActiveOfferId(subscription: Subscription | null, isPremium: boolean): OfferPlan["id"] | null {
+  if (subscription) {
+    return subscription.billingFrequency === "yearly" ? "premium_yearly" : "premium_monthly";
+  }
+
+  return isPremium ? null : "free";
 }
 
 export function ProfileScreen(): JSX.Element {
@@ -136,6 +297,8 @@ export function ProfileScreen(): JSX.Element {
   const navigation = useAppNavigation();
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const session = useAuthStore((state) => state.session);
   const profile = useWorkspaceStore((state) => state.profile);
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
@@ -172,8 +335,10 @@ export function ProfileScreen(): JSX.Element {
   const hasLifetimeOfferLocked = userExperience.discountPriceUnlocked;
   const hasActiveLimitedOffer = Boolean(userExperience.activeOffer);
   const hasDiscountedYearlyPrice = hasLifetimeOfferLocked || hasActiveLimitedOffer;
-  const offerPlans = buildOfferPlans(hasDiscountedYearlyPrice, hasLifetimeOfferLocked);
-  const premiumPlanLabel = getPremiumPlanLabel(premiumSubscription);
+  const offerPlans = buildOfferPlans(hasDiscountedYearlyPrice, hasLifetimeOfferLocked, isFrench);
+  const comparisonRows = getPremiumComparisonRows(isFrench);
+  const premiumPlanLabel = getPremiumPlanLabel(premiumSubscription, isFrench);
+  const activeOfferId = getActiveOfferId(premiumSubscription, isPremium);
   const premiumPriceLabel = premiumSubscription
     ? formatCurrency(premiumSubscription.price, premiumSubscription.currency)
     : null;
@@ -183,6 +348,138 @@ export function ProfileScreen(): JSX.Element {
   const premiumAccessEndsLabel = premiumSubscription
     ? formatLongDate(premiumSubscription.accessEndsAt ?? premiumSubscription.nextBillingDate)
     : null;
+  const copy = {
+    title: isFrench ? "Profil" : "Profile",
+    subtitle: isFrench
+      ? "Retrouve ici ton identite, ton plan actuel et la nouvelle grille d'avantages Premium."
+      : "See your identity, current plan and the updated Premium benefits here.",
+    back: isFrench ? "Retour" : "Back",
+    premiumActiveTitle: isFrench ? "Premium active" : "Premium active",
+    premiumYearlyBody: isFrench
+      ? "Ton abonnement Subly Premium annuel a ete ajoute automatiquement dans tes abonnements avec le bon tarif."
+      : "Your Subly Premium yearly subscription was automatically added to your subscriptions with the correct price.",
+    premiumMonthlyBody: isFrench
+      ? "Ton abonnement Subly Premium mensuel a ete ajoute automatiquement dans tes abonnements."
+      : "Your Subly Premium monthly subscription was automatically added to your subscriptions.",
+    activationFailed: isFrench ? "Activation impossible" : "Unable to activate",
+    activateLater: isFrench
+      ? "Impossible d'activer Premium pour le moment."
+      : "Unable to activate Premium right now.",
+    premiumMissingTitle: isFrench ? "Abonnement Premium introuvable" : "Premium subscription not found",
+    premiumMissingBody: isFrench
+      ? "Subly n'a pas retrouve la ligne de facturation Premium a programmer."
+      : "Subly could not find the Premium billing line to schedule.",
+    downgradeTitle: isFrench ? "Repasser au gratuit" : "Switch back to free",
+    keepPremium: isFrench ? "Garder Premium" : "Keep Premium",
+    confirm: isFrench ? "Confirmer" : "Confirm",
+    downgradeScheduledTitle: isFrench
+      ? "Retour au gratuit programme"
+      : "Return to free scheduled",
+    downgradeFailedTitle: isFrench ? "Programmation impossible" : "Unable to schedule",
+    downgradeFailedBody: isFrench
+      ? "Impossible de programmer le retour au gratuit."
+      : "Unable to schedule the return to free.",
+    premiumBadge: isFrench ? "Plan Premium" : "Premium plan",
+    freeBadge: isFrench ? "Plan Gratuit" : "Free plan",
+    currency: isFrench ? "Devise" : "Currency",
+    activeSubscriptions: isFrench ? "Abonnements actifs" : "Active subscriptions",
+    premiumSpace: isFrench ? "Ton espace Premium" : "Your Premium space",
+    goPremium: isFrench ? "Passe au niveau Premium" : "Move up to Premium",
+    comparePlans: isFrench ? "Comparer les formules" : "Compare plans",
+    switchToPremium: isFrench ? "Passer au Premium" : "Go Premium",
+    currentPlan: isFrench ? "Plan actuel" : "Current plan",
+    alreadyActive: isFrench ? "Deja actif" : "Already active",
+    capacityOpen: isFrench ? "Capacite ouverte" : "Open capacity",
+    freeProgress: isFrench ? "Progression sur le plan gratuit" : "Free plan progress",
+    premiumUsageBody: isFrench
+      ? "Tu peux ajouter autant d'abonnements et de services inclus que necessaire, avec toutes les fonctions avancees deja ouvertes."
+      : "You can add as many subscriptions and included services as needed, with every advanced feature already unlocked.",
+    freeUsageBody: (count: number) =>
+      isFrench
+        ? `Tu utilises ${count}/${FREE_PLAN_MAX_SUBSCRIPTIONS} abonnements disponibles sur le plan gratuit.`
+        : `You are using ${count}/${FREE_PLAN_MAX_SUBSCRIPTIONS} subscriptions available on the free plan.`,
+    freeRemainingBody: (remaining: number) =>
+      isFrench
+        ? `Encore ${remaining} emplacement(s) avant de devoir passer au Premium.`
+        : `${remaining} slot(s) left before you need to upgrade to Premium.`,
+    freeLimitReachedBody: isFrench
+      ? "La limite du plan gratuit est atteinte. Le Premium debloque l'ajout illimite."
+      : "The free plan limit has been reached. Premium unlocks unlimited additions.",
+    includedServicesLimitBody: isFrench
+      ? `Les services inclus restent limites a ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} par abonnement en version gratuite.`
+      : `Included services remain limited to ${FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} per subscription on the free version.`,
+    premiumLockBody: isFrench
+      ? "Les rappels personnalises, la detection des doublons et la suppression des pubs sont reserves au Premium."
+      : "Custom reminders, duplicate detection and ad removal are reserved for Premium.",
+    discountedOfferBody: isFrench
+      ? "Ton offre annuelle a -50% est deja reservee. Une fois le Premium active avec elle, ce tarif reste valable tant que ton Premium reste actif."
+      : "Your yearly -50% offer is already reserved. Once Premium is activated with it, that price stays valid as long as Premium remains active.",
+    premiumBenefitsOpen: isFrench
+      ? "Les statistiques avancees, le calendrier des prelevements, les rappels personnalises et l'experience sans pub sont disponibles."
+      : "Advanced statistics, the billing calendar, custom reminders and the ad-free experience are available.",
+    downgradeScheduledBody: (dateLabel: string | null) =>
+      isFrench
+        ? `Ton retour au gratuit est deja programme. Tu gardes Premium jusqu'au ${dateLabel}.`
+        : `Your switch back to free is already scheduled. You keep Premium until ${dateLabel}.`,
+    discountedPremiumBody: isFrench
+      ? "Ton tarif annuel a -50% reste conserve tant que ton Premium reste actif."
+      : "Your yearly -50% price stays preserved as long as Premium remains active.",
+    premiumBillingTitle: isFrench ? "Facturation Premium" : "Premium billing",
+    premiumBillingScheduledBody: isFrench
+      ? "Ton retour au gratuit est programme. Tu conserves l'acces Premium jusqu'a la fin de la periode deja payee."
+      : "Your switch back to free is scheduled. You keep Premium access until the end of the already paid period.",
+    premiumBillingNextBody: isFrench
+      ? "Retrouve ici la prochaine echeance de ton abonnement Premium."
+      : "See the next due date of your Premium subscription here.",
+    premiumBillingSyncBody: isFrench
+      ? "Les informations de facturation Premium se synchronisent avec ton abonnement Subly Premium."
+      : "Premium billing information syncs with your Subly Premium subscription.",
+    planLabel: isFrench ? "Formule" : "Plan",
+    cycleAmount: isFrench ? "Montant du cycle" : "Cycle amount",
+    nextCharge: isFrench ? "Prochain prelevement" : "Next charge",
+    accessUntil: isFrench ? "Acces jusqu'au" : "Access until",
+    chargeDate: isFrench ? "Date du prelevement" : "Charge date",
+    noFurtherChargeBody: isFrench
+      ? "Aucun nouveau prelevement n'est programme. Le compte repassera automatiquement au plan gratuit a la fin de cette periode."
+      : "No new charge is scheduled. The account will automatically return to the free plan at the end of this period.",
+    nextChargeBody: (dateLabel: string | null, priceLabel: string | null) =>
+      isFrench
+        ? `Prochaine echeance prevue le ${dateLabel} pour ${priceLabel}.`
+        : `Next due date is scheduled for ${dateLabel} for ${priceLabel}.`,
+    downgradeScheduledBadge: isFrench
+      ? "Retour au gratuit programme"
+      : "Return to free scheduled",
+    scheduling: isFrench ? "Programmation..." : "Scheduling...",
+    downgradeAtPeriodEnd: isFrench
+      ? "Repasser au gratuit en fin de periode"
+      : "Return to free at period end",
+    premiumPitch: isFrench
+      ? "Debloque les statistiques avancees, le calendrier des prelevements, la detection des abonnements peu utiles et des doublons, les rappels personnalises, l'export PDF des abonnements et une experience sans pub. La synchronisation cloud et la sauvegarde automatique sont deja prevues pour la suite."
+      : "Unlock advanced statistics, the billing calendar, low-utility and duplicate detection, custom reminders, subscription PDF export and an ad-free experience. Cloud sync and automatic backup are already planned next.",
+    yearlyOfferHint: isFrench
+      ? "L'offre annuelle a -50% est disponible sur ton compte et reste ensuite conservee tant que ton Premium reste actif."
+      : "The yearly -50% offer is available on your account and then stays preserved as long as Premium remains active.",
+    monthlyPriceLabel: isFrench ? PREMIUM_MONTHLY_PRICE : "EUR 2.99 / month",
+    yearlyPriceLabel: isFrench ? PREMIUM_YEARLY_PRICE : "EUR 19.99 / year",
+    yearlyDiscountedPriceLabel: isFrench
+      ? PREMIUM_YEARLY_LIFETIME_OFFER_PRICE
+      : "EUR 9.99 / year",
+    upgradeEyebrow: isFrench ? "Passer a Premium" : "Upgrade to Premium",
+    or: isFrench ? "ou" : "or",
+    discountedSheetBody: isFrench
+      ? "Ton compte dispose actuellement du tarif annuel a -50%. Une fois active avec cette offre, la remise reste liee a ton Premium tant qu'il reste actif."
+      : "Your account currently has access to the yearly -50% price. Once activated with this offer, the discount stays tied to your Premium while it remains active.",
+    upcomingInAppBillingBody: isFrench
+      ? "La facturation in-app sera branchee sur cet ecran dans une prochaine iteration. Les verrous produit sont deja poses dans l'app pour les stats avancees, les rappels personnalises et les cartes sponsorisees."
+      : "In-app billing will be connected on this screen in a future iteration. Product gates are already in place in the app for advanced stats, custom reminders and sponsored cards.",
+    soonLabel: isFrench ? "Bientot" : "Soon",
+    comparisonTitle: isFrench ? "Comparatif des avantages" : "Benefits comparison",
+    comparisonBodyText: isFrench
+      ? "Ce tableau distingue ce qui est deja actif dans le produit de ce qui est annonce pour la suite Premium."
+      : "This table separates what is already active in the product from what is announced for the Premium roadmap.",
+    freePlanLabel: isFrench ? "Gratuit" : "Free",
+    premiumPlanLabel: "Premium"
+  };
 
   const handleSelectOffer = async (offer: OfferPlan) => {
     if (offer.id === "free") {
@@ -201,60 +498,58 @@ export function ProfileScreen(): JSX.Element {
         );
         setPremiumModalVisible(false);
         Alert.alert(
-          "Premium active",
-          "Ton abonnement Subly Premium annuel a ete ajoute automatiquement dans tes abonnements avec le bon tarif."
+          copy.premiumActiveTitle,
+          copy.premiumYearlyBody
         );
         return;
       }
 
       await activatePremiumMembership("monthly");
       setPremiumModalVisible(false);
-      Alert.alert(
-        "Premium active",
-        "Ton abonnement Subly Premium mensuel a ete ajoute automatiquement dans tes abonnements."
-      );
+      Alert.alert(copy.premiumActiveTitle, copy.premiumMonthlyBody);
     } catch (error) {
       Alert.alert(
-        "Activation impossible",
-        error instanceof Error ? error.message : "Impossible d'activer Premium pour le moment."
+        copy.activationFailed,
+        error instanceof Error ? error.message : copy.activateLater
       );
     }
   };
 
   const handleSchedulePremiumDowngrade = () => {
     if (!premiumSubscription) {
-      Alert.alert(
-        "Abonnement Premium introuvable",
-        "Subly n'a pas retrouve la ligne de facturation Premium a programmer."
-      );
+      Alert.alert(copy.premiumMissingTitle, copy.premiumMissingBody);
       return;
     }
 
     Alert.alert(
-      "Repasser au gratuit",
-      `Ton Premium restera actif jusqu'au ${premiumAccessEndsLabel}. Aucun nouveau prelevement ne sera programme apres cette date.`,
+      copy.downgradeTitle,
+      isFrench
+        ? `Ton Premium restera actif jusqu'au ${premiumAccessEndsLabel}. Aucun nouveau prelevement ne sera programme apres cette date.`
+        : `Your Premium will stay active until ${premiumAccessEndsLabel}. No new charge will be scheduled after that date.`,
       [
         {
-          text: "Garder Premium",
+          text: copy.keepPremium,
           style: "cancel"
         },
         {
-          text: "Confirmer",
+          text: copy.confirm,
           style: "destructive",
           onPress: () => {
             void (async () => {
               try {
                 await schedulePremiumDowngrade();
                 Alert.alert(
-                  "Retour au gratuit programme",
-                  `Ton compte restera Premium jusqu'au ${premiumAccessEndsLabel}, puis repassera automatiquement sur la formule gratuite.`
+                  copy.downgradeScheduledTitle,
+                  isFrench
+                    ? `Ton compte restera Premium jusqu'au ${premiumAccessEndsLabel}, puis repassera automatiquement sur la formule gratuite.`
+                    : `Your account will stay Premium until ${premiumAccessEndsLabel}, then automatically return to the free plan.`
                 );
               } catch (error) {
                 Alert.alert(
-                  "Programmation impossible",
+                  copy.downgradeFailedTitle,
                   error instanceof Error
                     ? error.message
-                    : "Impossible de programmer le retour au gratuit."
+                    : copy.downgradeFailedBody
                 );
               }
             })();
@@ -267,9 +562,9 @@ export function ProfileScreen(): JSX.Element {
   return (
     <>
       <Screen
-        title="Profil"
-        subtitle="Retrouve ici ton identite, ton plan actuel et la nouvelle grille d'avantages Premium."
-        action={<PrimaryButton title="Retour" onPress={navigation.goBack} variant="secondary" />}
+        title={copy.title}
+        subtitle={copy.subtitle}
+        action={<PrimaryButton title={copy.back} onPress={navigation.goBack} variant="secondary" />}
       >
         <View style={styles.card}>
           <View style={styles.avatar}>
@@ -279,21 +574,23 @@ export function ProfileScreen(): JSX.Element {
           <Text style={styles.email}>{profile?.email ?? session?.email ?? "sarah@subly.app"}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {isPremium ? "Plan Premium" : "Plan Gratuit"}
+              {isPremium ? copy.premiumBadge : copy.freeBadge}
             </Text>
           </View>
-          <Text style={styles.meta}>Devise : {profile?.currency ?? "EUR"}</Text>
-          <Text style={styles.meta}>Abonnements actifs : {activeSubscriptionCount}</Text>
+          <Text style={styles.meta}>{copy.currency} : {profile?.currency ?? "EUR"}</Text>
+          <Text style={styles.meta}>
+            {copy.activeSubscriptions} : {activeSubscriptionCount}
+          </Text>
         </View>
 
         <View style={styles.usageCard}>
           <Text style={styles.usageTitle}>
-            {isPremium ? "Capacite ouverte" : "Progression sur le plan gratuit"}
+            {isPremium ? copy.capacityOpen : copy.freeProgress}
           </Text>
           <Text style={styles.usageBody}>
             {isPremium
-              ? "Tu peux ajouter autant d'abonnements et de services inclus que necessaire, avec toutes les fonctions avancees deja ouvertes."
-              : `Tu utilises ${activeSubscriptionCount}/${FREE_PLAN_MAX_SUBSCRIPTIONS} abonnements disponibles sur le plan gratuit.`}
+              ? copy.premiumUsageBody
+              : copy.freeUsageBody(activeSubscriptionCount)}
           </Text>
           {!isPremium ? (
             <>
@@ -309,35 +606,25 @@ export function ProfileScreen(): JSX.Element {
               </View>
               <Text style={styles.usageHint}>
                 {remainingFreeSlots > 0
-                  ? `Encore ${remainingFreeSlots} emplacement(s) avant de devoir passer au Premium.`
-                  : "La limite du plan gratuit est atteinte. Le Premium debloque l'ajout illimite."}
+                  ? copy.freeRemainingBody(remainingFreeSlots)
+                  : copy.freeLimitReachedBody}
               </Text>
-              <Text style={styles.usageHint}>
-                Les services inclus restent limites a {FREE_PLAN_MAX_INCLUDED_SERVICES_PER_SUBSCRIPTION} par abonnement en version gratuite.
-              </Text>
-              <Text style={styles.usageHint}>
-                Les rappels personnalises, la detection des doublons et la suppression des pubs sont reserves au Premium.
-              </Text>
+              <Text style={styles.usageHint}>{copy.includedServicesLimitBody}</Text>
+              <Text style={styles.usageHint}>{copy.premiumLockBody}</Text>
               {hasDiscountedYearlyPrice ? (
-                <Text style={styles.usageHintStrong}>
-                  Ton offre annuelle a -50% est deja reservee. Une fois le Premium active avec elle, ce tarif reste valable tant que ton Premium reste actif.
-                </Text>
+                <Text style={styles.usageHintStrong}>{copy.discountedOfferBody}</Text>
               ) : null}
             </>
           ) : (
             <>
-              <Text style={styles.usageHint}>
-                Les statistiques avancees, le calendrier des prelevements, les rappels personnalises et l'experience sans pub sont disponibles.
-              </Text>
+              <Text style={styles.usageHint}>{copy.premiumBenefitsOpen}</Text>
               {premiumSubscription?.cancelAtPeriodEnd ? (
                 <Text style={styles.usageHintStrong}>
-                  Ton retour au gratuit est deja programme. Tu gardes Premium jusqu'au {premiumAccessEndsLabel}.
+                  {copy.downgradeScheduledBody(premiumAccessEndsLabel)}
                 </Text>
               ) : null}
               {userExperience.discountedPremiumActive ? (
-                <Text style={styles.usageHintStrong}>
-                  Ton tarif annuel a -50% reste conserve tant que ton Premium reste actif.
-                </Text>
+                <Text style={styles.usageHintStrong}>{copy.discountedPremiumBody}</Text>
               ) : null}
             </>
           )}
@@ -345,35 +632,35 @@ export function ProfileScreen(): JSX.Element {
 
         {isPremium ? (
           <View style={styles.billingCard}>
-            <Text style={styles.billingTitle}>Facturation Premium</Text>
+            <Text style={styles.billingTitle}>{copy.premiumBillingTitle}</Text>
             <Text style={styles.billingBody}>
               {premiumSubscription
                 ? premiumSubscription.cancelAtPeriodEnd
-                  ? "Ton retour au gratuit est programme. Tu conserves l'acces Premium jusqu'a la fin de la periode deja payee."
-                  : "Retrouve ici la prochaine echeance de ton abonnement Premium."
-                : "Les informations de facturation Premium se synchronisent avec ton abonnement Subly Premium."}
+                  ? copy.premiumBillingScheduledBody
+                  : copy.premiumBillingNextBody
+                : copy.premiumBillingSyncBody}
             </Text>
 
             {premiumSubscription ? (
               <>
                 <View style={[styles.billingGrid, isCompact ? styles.billingGridCompact : null]}>
                   <View style={styles.billingMetric}>
-                    <Text style={styles.billingMetricLabel}>Formule</Text>
+                    <Text style={styles.billingMetricLabel}>{copy.planLabel}</Text>
                     <Text style={styles.billingMetricValue}>{premiumPlanLabel}</Text>
                   </View>
                   <View style={styles.billingMetric}>
                     <Text style={styles.billingMetricLabel}>
                       {premiumSubscription.cancelAtPeriodEnd
-                        ? "Montant du cycle"
-                        : "Prochain prelevement"}
+                        ? copy.cycleAmount
+                        : copy.nextCharge}
                     </Text>
                     <Text style={styles.billingMetricValue}>{premiumPriceLabel}</Text>
                   </View>
                   <View style={styles.billingMetric}>
                     <Text style={styles.billingMetricLabel}>
                       {premiumSubscription.cancelAtPeriodEnd
-                        ? "Acces jusqu'au"
-                        : "Date du prelevement"}
+                        ? copy.accessUntil
+                        : copy.chargeDate}
                     </Text>
                     <Text style={styles.billingMetricValue}>
                       {premiumSubscription.cancelAtPeriodEnd
@@ -385,22 +672,22 @@ export function ProfileScreen(): JSX.Element {
 
                 <Text style={styles.billingNote}>
                   {premiumSubscription.cancelAtPeriodEnd
-                    ? "Aucun nouveau prelevement n'est programme. Le compte repassera automatiquement au plan gratuit a la fin de cette periode."
-                    : `Prochaine echeance prevue le ${premiumNextBillingLabel} pour ${premiumPriceLabel}.`}
+                    ? copy.noFurtherChargeBody
+                    : copy.nextChargeBody(premiumNextBillingLabel, premiumPriceLabel)}
                 </Text>
 
                 {premiumSubscription.cancelAtPeriodEnd ? (
                   <View style={styles.billingScheduledBadge}>
                     <Text style={styles.billingScheduledBadgeLabel}>
-                      Retour au gratuit programme
+                      {copy.downgradeScheduledBadge}
                     </Text>
                   </View>
                 ) : (
                   <PrimaryButton
                     title={
                       isSchedulingPremiumDowngrade
-                        ? "Programmation..."
-                        : "Repasser au gratuit en fin de periode"
+                        ? copy.scheduling
+                        : copy.downgradeAtPeriodEnd
                     }
                     onPress={handleSchedulePremiumDowngrade}
                     variant="secondary"
@@ -414,18 +701,14 @@ export function ProfileScreen(): JSX.Element {
 
         <View style={styles.premiumCard}>
           <Text style={styles.premiumTitle}>
-            {isPremium ? "Ton espace Premium" : "Passe au niveau Premium"}
+            {isPremium ? copy.premiumSpace : copy.goPremium}
           </Text>
-          <Text style={styles.premiumBody}>
-            Debloque les statistiques avancees, le calendrier des prelevements, la detection des abonnements peu utiles et des doublons, les rappels personnalises et une experience sans pub. La synchronisation cloud, la sauvegarde automatique et le partage avec un proche sont deja prevus pour la suite.
-          </Text>
+          <Text style={styles.premiumBody}>{copy.premiumPitch}</Text>
           {hasDiscountedYearlyPrice ? (
-            <Text style={styles.premiumOfferHint}>
-              L'offre annuelle a -50% est disponible sur ton compte et reste ensuite conservee tant que ton Premium reste actif.
-            </Text>
+            <Text style={styles.premiumOfferHint}>{copy.yearlyOfferHint}</Text>
           ) : null}
           <PrimaryButton
-            title={isPremium ? "Comparer les formules" : "Passer au Premium"}
+            title={isPremium ? copy.comparePlans : copy.switchToPremium}
             onPress={() => setPremiumModalVisible(true)}
           />
         </View>
@@ -442,13 +725,13 @@ export function ProfileScreen(): JSX.Element {
           <View style={[styles.sheet, isCompact ? styles.sheetCompact : null]}>
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderText}>
-                <Text style={styles.sheetEyebrow}>Passer a Premium</Text>
-                <Text style={styles.sheetTitle}>{PREMIUM_MONTHLY_PRICE}</Text>
-                <Text style={styles.sheetOr}>ou</Text>
+                <Text style={styles.sheetEyebrow}>{copy.upgradeEyebrow}</Text>
+                <Text style={styles.sheetTitle}>{copy.monthlyPriceLabel}</Text>
+                <Text style={styles.sheetOr}>{copy.or}</Text>
                 <Text style={styles.sheetTitleSecondary}>
                   {hasDiscountedYearlyPrice
-                    ? PREMIUM_YEARLY_LIFETIME_OFFER_PRICE
-                    : PREMIUM_YEARLY_PRICE}
+                    ? copy.yearlyDiscountedPriceLabel
+                    : copy.yearlyPriceLabel}
                 </Text>
               </View>
               <Pressable
@@ -461,78 +744,88 @@ export function ProfileScreen(): JSX.Element {
 
             <Text style={styles.sheetSubtitle}>
               {hasDiscountedYearlyPrice
-                ? "Ton compte dispose actuellement du tarif annuel a -50%. Une fois active avec cette offre, la remise reste liee a ton Premium tant qu'il reste actif."
-                : "La facturation in-app sera branchee sur cet ecran dans une prochaine iteration. Les verrous produit sont deja poses dans l'app pour les stats avancees, les rappels personnalises et les cartes sponsorisees."}
+                ? copy.discountedSheetBody
+                : copy.upcomingInAppBillingBody}
             </Text>
 
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.offerList}
             >
-              {offerPlans.map((offer) => (
-                <View
-                  key={offer.id}
-                  style={[
-                    styles.offerCard,
-                    offer.tone === "orange" ? styles.offerCardOrange : null,
-                    offer.tone === "purple" ? styles.offerCardPurple : null
-                  ]}
-                >
-                  <View style={styles.offerHeader}>
-                    <View style={styles.offerIdentity}>
-                      <Text style={styles.offerTitle}>{offer.title}</Text>
-                      <Text style={styles.offerPrice}>{offer.price}</Text>
-                      <Text style={styles.offerSubtitle}>{offer.subtitle}</Text>
-                    </View>
-                    {offer.highlight ? (
-                      <View
-                        style={[
-                          styles.offerBadge,
-                          offer.tone === "purple" ? styles.offerBadgePurple : styles.offerBadgeOrange
-                        ]}
-                      >
-                        <Text style={styles.offerBadgeLabel}>{offer.highlight}</Text>
-                      </View>
-                    ) : null}
-                  </View>
+              {offerPlans.map((offer) => {
+                const isCurrentOffer = activeOfferId === offer.id;
 
-                  <View style={styles.featureList}>
-                    {offer.features.map((feature) => (
-                      <View key={`${offer.id}_${feature.label}`} style={styles.featureRow}>
-                        <View
-                          style={[
-                            styles.featureDot,
-                            offer.tone === "orange" ? styles.featureDotOrange : null,
-                            offer.tone === "purple" ? styles.featureDotPurple : null
-                          ]}
-                        />
-                        <Text style={styles.featureText}>{feature.label}</Text>
-                        {feature.state === "coming_soon" ? (
-                          <View style={styles.featureStatusBadge}>
-                            <Text style={styles.featureStatusLabel}>Bientot</Text>
+                return (
+                  <View
+                    key={offer.id}
+                    style={[
+                      styles.offerCard,
+                      offer.tone === "orange" ? styles.offerCardOrange : null,
+                      offer.tone === "purple" ? styles.offerCardPurple : null,
+                      isCurrentOffer ? styles.offerCardCurrent : null
+                    ]}
+                  >
+                    <View style={styles.offerHeader}>
+                      <View style={styles.offerIdentity}>
+                        <Text style={styles.offerTitle}>{offer.title}</Text>
+                        <Text style={styles.offerPrice}>{offer.price}</Text>
+                        <Text style={styles.offerSubtitle}>{offer.subtitle}</Text>
+                      </View>
+                      <View style={styles.offerHeaderAside}>
+                        {isCurrentOffer ? (
+                          <View style={styles.offerCurrentBadge}>
+                            <Text style={styles.offerCurrentBadgeLabel}>{copy.currentPlan}</Text>
+                          </View>
+                        ) : null}
+                        {offer.highlight ? (
+                          <View
+                            style={[
+                              styles.offerBadge,
+                              offer.tone === "purple" ? styles.offerBadgePurple : styles.offerBadgeOrange
+                            ]}
+                          >
+                            <Text style={styles.offerBadgeLabel}>{offer.highlight}</Text>
                           </View>
                         ) : null}
                       </View>
-                    ))}
-                  </View>
+                    </View>
 
-                  <PrimaryButton
-                    title={offer.cta}
-                    onPress={() => void handleSelectOffer(offer)}
-                    variant={offer.id === "free" ? "secondary" : "primary"}
-                    disabled={offer.id !== "free" && isActivatingPremium}
-                  />
-                </View>
-              ))}
+                    <View style={styles.featureList}>
+                      {offer.features.map((feature, index) => (
+                        <View key={`${offer.id}_${feature.label}_${index}`} style={styles.featureRow}>
+                          <View
+                            style={[
+                              styles.featureDot,
+                              offer.tone === "orange" ? styles.featureDotOrange : null,
+                              offer.tone === "purple" ? styles.featureDotPurple : null
+                            ]}
+                          />
+                          <Text style={styles.featureText}>{feature.label}</Text>
+                          {feature.state === "coming_soon" ? (
+                            <View style={styles.featureStatusBadge}>
+                              <Text style={styles.featureStatusLabel}>{copy.soonLabel}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+
+                    <PrimaryButton
+                      title={isCurrentOffer ? copy.alreadyActive : offer.cta}
+                      onPress={() => void handleSelectOffer(offer)}
+                      variant={offer.id === "free" || isCurrentOffer ? "secondary" : "primary"}
+                      disabled={isCurrentOffer || (offer.id !== "free" && isActivatingPremium)}
+                    />
+                  </View>
+                );
+              })}
 
               <View style={styles.comparisonSection}>
-                <Text style={styles.comparisonTitle}>Comparatif des avantages</Text>
-                <Text style={styles.comparisonBody}>
-                  Ce tableau distingue ce qui est deja actif dans le produit de ce qui est annonce pour la suite Premium.
-                </Text>
+                <Text style={styles.comparisonTitle}>{copy.comparisonTitle}</Text>
+                <Text style={styles.comparisonBody}>{copy.comparisonBodyText}</Text>
 
                 <View style={styles.comparisonList}>
-                  {PREMIUM_COMPARISON_ROWS.map((row) => (
+                  {comparisonRows.map((row) => (
                     <View key={row.id} style={styles.comparisonRow}>
                       <View style={styles.comparisonText}>
                         <Text style={styles.comparisonRowTitle}>{row.title}</Text>
@@ -540,15 +833,15 @@ export function ProfileScreen(): JSX.Element {
                       </View>
                       <View style={[styles.comparisonValues, isCompact ? styles.comparisonValuesCompact : null]}>
                         <View style={styles.planValue}>
-                          <Text style={styles.planValueLabel}>Gratuit</Text>
+                          <Text style={styles.planValueLabel}>{copy.freePlanLabel}</Text>
                           <Text style={styles.planValueText}>{row.freeValue}</Text>
                         </View>
                         <View style={[styles.planValue, styles.planValuePremium]}>
-                          <Text style={styles.planValueLabel}>Premium</Text>
+                          <Text style={styles.planValueLabel}>{copy.premiumPlanLabel}</Text>
                           <Text style={styles.planValueText}>{row.premiumValue}</Text>
                           {row.premiumState === "coming_soon" ? (
                             <View style={styles.planValueBadge}>
-                              <Text style={styles.planValueBadgeLabel}>Bientot</Text>
+                              <Text style={styles.planValueBadgeLabel}>{copy.soonLabel}</Text>
                             </View>
                           ) : null}
                         </View>
@@ -837,6 +1130,11 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border
   },
+  offerCardCurrent: {
+    borderColor: theme.colors.primaryStrong,
+    backgroundColor: theme.colors.surfaceContrast,
+    ...shadows.glow
+  },
   offerCardOrange: {
     borderColor: "rgba(255, 184, 77, 0.34)",
     backgroundColor: "rgba(255, 184, 77, 0.06)"
@@ -850,6 +1148,10 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md
+  },
+  offerHeaderAside: {
+    alignItems: "flex-end",
+    gap: spacing.xs
   },
   offerIdentity: {
     flex: 1,
@@ -873,6 +1175,19 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: 999
+  },
+  offerCurrentBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primaryStrong
+  },
+  offerCurrentBadgeLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    color: "#241602"
   },
   offerBadgeOrange: {
     backgroundColor: "rgba(255, 184, 77, 0.16)"

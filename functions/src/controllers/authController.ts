@@ -32,6 +32,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     language: DEFAULT_LANGUAGE,
     colorBlindMode: false,
     notificationPreferences: {
+      notificationsEnabled: true,
       paymentReminders: true,
       trialReminders: true,
       insightNotifications: true,

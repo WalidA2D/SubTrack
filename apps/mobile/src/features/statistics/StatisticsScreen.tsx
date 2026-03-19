@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Subscription } from "@subly/shared";
 
+import { HeaderActionButton } from "../../components/HeaderActionButton";
 import { PromoCard } from "../../components/PromoCard";
 import { Screen } from "../../components/Screen";
 import { isPremiumPlan } from "../../constants/premium";
@@ -65,7 +66,8 @@ export function StatisticsScreen(): JSX.Element {
   const styles = createStyles(theme);
   const navigation = useAppNavigation();
   const statistics = useWorkspaceStore((state) => state.statistics);
-  const { t } = useAppTranslation();
+  const { locale, t } = useAppTranslation();
+  const isFrench = locale === "fr";
   const subscriptions = useWorkspaceStore((state) => state.subscriptions);
   const profile = useWorkspaceStore((state) => state.profile);
   const isPremium = isPremiumPlan(profile);
@@ -131,38 +133,109 @@ export function StatisticsScreen(): JSX.Element {
     (subscription) => subscription.status === "trial"
   ).length;
   const averageLabel =
-    averageMode === "monthly" ? t("statistics.averagePerMonth") : "Moyenne / an";
+    averageMode === "monthly"
+      ? t("statistics.averagePerMonth")
+      : isFrench
+        ? "Moyenne / an"
+        : "Average / year";
   const averageValue =
     averageMode === "monthly" ? monthlyAverage : monthlyAverage * 12;
+  const copy = {
+    premiumTitle: isFrench ? "Disponible avec Premium" : "Available with Premium",
+    later: isFrench ? "Plus tard" : "Later",
+    viewPremium: isFrench ? "Voir Premium" : "See Premium",
+    activeHelper: isFrench ? "Touchez pour voir la liste" : "Tap to view the list",
+    lowUsageHelper: isFrench ? "Touchez pour ouvrir le detail" : "Tap to open details",
+    premiumOnly: isFrench ? "Reserve au Premium" : "Premium only",
+    switchAnnual: isFrench ? "Touchez pour passer en annuel" : "Tap to switch to yearly",
+    switchMonthly: isFrench ? "Touchez pour revenir au mensuel" : "Tap to switch back to monthly",
+    totalShare: (percentage: number) =>
+      isFrench ? `${percentage}% du total` : `${percentage}% of total`,
+    activeListEyebrow: isFrench ? "Liste active" : "Active list",
+    lowUsageEyebrow: isFrench ? "A surveiller" : "To watch",
+    activeListTitle: isFrench ? "Abonnements actifs" : "Active subscriptions",
+    lowUsageTitle: isFrench ? "Abonnements peu utiles" : "Low-utility subscriptions",
+    activeListBody: isFrench
+      ? "Retrouve ici tous les abonnements actifs et ouvre une fiche en un tap."
+      : "Find all active subscriptions here and open a detail sheet in one tap.",
+    lowUsageBody: isFrench
+      ? "Subly regroupe ici les services peu utilises, redondants ou a verifier."
+      : "Subly groups low-usage, redundant or to-review services here.",
+    subscriptions: isFrench ? "Abonnements" : "Subscriptions",
+    close: isFrench ? "Fermer" : "Close",
+    nextDue: isFrench ? "prochaine echeance le" : "next due on",
+    noActiveNow: isFrench
+      ? "Aucun abonnement actif a afficher pour le moment."
+      : "No active subscription to show right now.",
+    noLowUsage: isFrench
+      ? "Aucun abonnement peu utile detecte sur la selection actuelle."
+      : "No low-utility subscription detected in the current selection.",
+    categoryRankMeta: (count: number, percentage: number) =>
+      isFrench
+        ? `${count} abonnement(s) · ${percentage}%`
+        : `${count} subscription(s) · ${percentage}%`,
+    categoryRankingEmpty: isFrench
+      ? "Ajoute quelques abonnements pour construire le classement des categories."
+      : "Add a few subscriptions to build the category ranking.",
+    perMonth: isFrench ? "/ mois" : "/ month",
+    simpleView: isFrench ? "Vue simple" : "Simple view",
+    trackedCategories: isFrench ? "Categories suivies" : "Tracked categories",
+    currentTrials: isFrench ? "Essais en cours" : "Current trials",
+    calendarFeature: isFrench ? "Le calendrier des prelevements" : "The billing calendar",
+    lowUsageFeature: isFrench
+      ? "La detection des abonnements peu utiles et des doublons"
+      : "Low-usage and duplicate detection",
+    advancedStatsTitle: isFrench ? "Statistiques avancees" : "Advanced statistics",
+    advancedStatsBody: isFrench
+      ? "Passe au Premium pour debloquer les graphiques, le podium des categories, le calendrier des prelevements et la detection des doublons."
+      : "Upgrade to Premium to unlock charts, category podium, billing calendar and duplicate detection.",
+    seePremium: isFrench ? "Voir le Premium" : "See Premium"
+  };
 
   const toggleDrilldown = (nextDrilldown: Exclude<StatisticsDrilldown, null>) => {
     setSelectedDrilldown((current) => (current === nextDrilldown ? null : nextDrilldown));
   };
 
   const handleOpenPremium = (feature: string) => {
-    Alert.alert("Disponible avec Premium", `${feature} fait partie des avantages Premium.`, [
+    Alert.alert(copy.premiumTitle, `${feature} ${isFrench ? "fait partie des avantages Premium." : "is part of Premium benefits."}`, [
       {
-        text: "Plus tard",
+        text: copy.later,
         style: "cancel"
       },
       {
-        text: "Voir Premium",
+        text: copy.viewPremium,
         onPress: () => navigation.navigate("Profile")
       }
     ]);
   };
 
   const statisticsHeaderAction = (
-    <Pressable
-      style={styles.headerIconButton}
-      onPress={() =>
-        isPremium
-          ? navigation.navigate("StatisticsCalendar")
-          : handleOpenPremium("Le calendrier des prelevements")
-      }
-    >
-      <CalendarGlyph />
-    </Pressable>
+    <View style={styles.headerActionRow}>
+      <HeaderActionButton
+        kind="notifications"
+        size="md"
+        onPress={() => navigation.navigate("NotificationCenter")}
+      />
+      <HeaderActionButton
+        kind="calendar"
+        size="md"
+        onPress={() =>
+          isPremium
+            ? navigation.navigate("StatisticsCalendar")
+            : handleOpenPremium(copy.calendarFeature)
+        }
+      />
+      <HeaderActionButton
+        kind="profile"
+        size="md"
+        onPress={() => navigation.navigate("Profile")}
+      />
+      <HeaderActionButton
+        kind="settings"
+        size="md"
+        onPress={() => navigation.navigate("Settings")}
+      />
+    </View>
   );
 
   return (
@@ -170,6 +243,7 @@ export function StatisticsScreen(): JSX.Element {
       title={t("statistics.title")}
       subtitle={t("statistics.subtitle")}
       action={statisticsHeaderAction}
+      headerLayout="stacked"
     >
       <View style={styles.summaryGrid}>
         <SummaryCard
@@ -179,7 +253,7 @@ export function StatisticsScreen(): JSX.Element {
           tone="orange"
           onPress={() => toggleDrilldown("active")}
           selected={selectedDrilldown === "active"}
-          helper="Touchez pour voir la liste"
+          helper={copy.activeHelper}
         />
         <SummaryCard
           compactWidth={isCompact}
@@ -189,10 +263,10 @@ export function StatisticsScreen(): JSX.Element {
           onPress={() =>
             isPremium
               ? toggleDrilldown("lowUsage")
-              : handleOpenPremium("La detection des abonnements peu utiles et des doublons")
+              : handleOpenPremium(copy.lowUsageFeature)
           }
           selected={isPremium && selectedDrilldown === "lowUsage"}
-          helper={isPremium ? "Touchez pour ouvrir le detail" : "Reserve au Premium"}
+          helper={isPremium ? copy.lowUsageHelper : copy.premiumOnly}
         />
         <SummaryCard
           compactWidth={isCompact}
@@ -204,8 +278,8 @@ export function StatisticsScreen(): JSX.Element {
           }
           helper={
             averageMode === "monthly"
-              ? "Touchez pour passer en annuel"
-              : "Touchez pour revenir au mensuel"
+              ? copy.switchAnnual
+              : copy.switchMonthly
           }
         />
         <SummaryCard
@@ -214,13 +288,11 @@ export function StatisticsScreen(): JSX.Element {
           value={isPremium ? topCategory?.categoryName ?? t("statistics.none") : "Premium"}
           tone="red"
           compact
-          onPress={() =>
-            isPremium
-              ? toggleDrilldown("topCategory")
-              : handleOpenPremium("Le classement avance des categories")
+          helper={
+            isPremium && topCategory
+              ? copy.totalShare(Math.round(topCategory.percentage * 100))
+              : copy.premiumOnly
           }
-          selected={isPremium && selectedDrilldown === "topCategory"}
-          helper={isPremium ? "Touchez pour voir le podium" : "Reserve au Premium"}
         />
       </View>
 
@@ -230,41 +302,31 @@ export function StatisticsScreen(): JSX.Element {
             <View style={styles.drilldownHeaderText}>
               <Text style={styles.sectionEyebrow}>
                 {selectedDrilldown === "active"
-                  ? "Liste active"
-                  : selectedDrilldown === "lowUsage"
-                    ? "A surveiller"
-                    : "Classement"}
+                  ? copy.activeListEyebrow
+                  : copy.lowUsageEyebrow}
               </Text>
               <Text style={styles.cardTitle}>
                 {selectedDrilldown === "active"
-                  ? "Abonnements actifs"
-                  : selectedDrilldown === "lowUsage"
-                    ? "Abonnements peu utiles"
-                    : "Top categories"}
+                  ? copy.activeListTitle
+                  : copy.lowUsageTitle}
               </Text>
               <Text style={styles.drilldownDescription}>
                 {selectedDrilldown === "active"
-                  ? "Retrouve ici tous les abonnements actifs et ouvre une fiche en un tap."
-                  : selectedDrilldown === "lowUsage"
-                    ? "Subly regroupe ici les services peu utilises, redondants ou a verifier."
-                    : "Les categories sont classees par poids dans tes depenses avec un podium pour les trois premieres."}
+                  ? copy.activeListBody
+                  : copy.lowUsageBody}
               </Text>
             </View>
             <View style={styles.drilldownActions}>
               <MetricPill
-                label={
-                  selectedDrilldown === "topCategory" ? "Categories" : "Abonnements"
-                }
+                label={copy.subscriptions}
                 value={String(
                   selectedDrilldown === "active"
                     ? activeSubscriptions.length
-                    : selectedDrilldown === "lowUsage"
-                      ? lowUtilityItems.length
-                      : categoryRanking.length
+                    : lowUtilityItems.length
                 )}
               />
               <Pressable onPress={() => setSelectedDrilldown(null)}>
-                <Text style={styles.drilldownDismiss}>Fermer</Text>
+                <Text style={styles.drilldownDismiss}>{copy.close}</Text>
               </Pressable>
             </View>
           </View>
@@ -277,7 +339,7 @@ export function StatisticsScreen(): JSX.Element {
                     key={subscription.id}
                     subscription={subscription}
                     currency={currency}
-                    subtitle={`${subscription.categoryName} · prochaine echeance le ${formatLongDate(
+                    subtitle={`${subscription.categoryName} · ${copy.nextDue} ${formatLongDate(
                       subscription.nextBillingDate
                     )}`}
                     chips={[formatUsageCheckIn(subscription.usageCheckIn)]}
@@ -290,7 +352,7 @@ export function StatisticsScreen(): JSX.Element {
                 ))}
               </View>
             ) : (
-              <EmptyState message="Aucun abonnement actif a afficher pour le moment." />
+              <EmptyState message={copy.noActiveNow} />
             )
           ) : null}
 
@@ -303,10 +365,11 @@ export function StatisticsScreen(): JSX.Element {
                     subscription={item.subscription}
                     currency={currency}
                     subtitle={`${item.subscription.categoryName} · ${buildLowUtilitySubtitle(
-                      item.subscription
+                      item.subscription,
+                      isFrench
                     )}`}
                     chips={item.reasons.map((reason) =>
-                      describeLowUtilityReason(reason, item.subscription.lastUsedAt ?? null)
+                      describeLowUtilityReason(reason, item.subscription.lastUsedAt ?? null, isFrench)
                     )}
                     onPress={() =>
                       navigation.navigate("SubscriptionDetails", {
@@ -317,7 +380,7 @@ export function StatisticsScreen(): JSX.Element {
                 ))}
               </View>
             ) : (
-              <EmptyState message="Aucun abonnement peu utile detecte sur la selection actuelle." />
+              <EmptyState message={copy.noLowUsage} />
             )
           ) : null}
 
@@ -338,21 +401,24 @@ export function StatisticsScreen(): JSX.Element {
                       <View style={styles.categoryRankingText}>
                         <Text style={styles.categoryRankingTitle}>{category.categoryName}</Text>
                         <Text style={styles.categoryRankingMeta}>
-                          {category.subscriptionCount} abonnement(s) · {Math.round(category.percentage * 100)}%
+                          {copy.categoryRankMeta(
+                            category.subscriptionCount,
+                            Math.round(category.percentage * 100)
+                          )}
                         </Text>
                       </View>
                       <View style={styles.categoryRankingAmounts}>
                         <Text style={styles.categoryRankingAmount}>
                           {formatCurrency(category.amountMonthly, currency)}
                         </Text>
-                        <Text style={styles.categoryRankingAmountMeta}>/ mois</Text>
+                        <Text style={styles.categoryRankingAmountMeta}>{copy.perMonth}</Text>
                       </View>
                     </View>
                   ))}
                 </View>
               </View>
             ) : (
-              <EmptyState message="Ajoute quelques abonnements pour construire le classement des categories." />
+              <EmptyState message={copy.categoryRankingEmpty} />
             )
           ) : null}
         </View>
@@ -405,7 +471,7 @@ export function StatisticsScreen(): JSX.Element {
                   ? `${biggestSubscription.providerName} - ${formatCurrency(
                       biggestSubscription.amountMonthly,
                       currency
-                    )} / mois`
+                    )} ${copy.perMonth}`
                   : t("statistics.noActiveSubscription")
               }
             />
@@ -426,25 +492,25 @@ export function StatisticsScreen(): JSX.Element {
       ) : (
         <>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Vue simple</Text>
+            <Text style={styles.cardTitle}>{copy.simpleView}</Text>
             <InsightRow
-              label="Total mensuel"
+              label={isFrench ? "Total mensuel" : "Monthly total"}
               value={formatCurrency(categoryTotal, currency)}
             />
             <InsightRow
-              label="Categories suivies"
+              label={copy.trackedCategories}
               value={String(categoryRanking.length)}
             />
             <InsightRow
-              label="Essais en cours"
+              label={copy.currentTrials}
               value={String(trialCount)}
             />
           </View>
           <PromoCard
             eyebrow="Premium"
-            title="Statistiques avancees"
-            body="Passe au Premium pour debloquer les graphiques, le podium des categories, le calendrier des prelevements et la detection des doublons."
-            ctaLabel="Voir le Premium"
+            title={copy.advancedStatsTitle}
+            body={copy.advancedStatsBody}
+            ctaLabel={copy.seePremium}
             onPress={() => navigation.navigate("Profile")}
             tone="purple"
           />
@@ -565,6 +631,8 @@ function SubscriptionDrilldownRow({
   onPress: () => void;
 }): JSX.Element {
   const styles = createStyles(useAppTheme());
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
 
   return (
     <Pressable style={styles.subscriptionDrilldownRow} onPress={onPress}>
@@ -577,7 +645,9 @@ function SubscriptionDrilldownRow({
           <Text style={styles.subscriptionDrilldownAmount}>
             {formatCurrency(subscription.priceMonthly, currency)}
           </Text>
-          <Text style={styles.subscriptionDrilldownAmountMeta}>/ mois</Text>
+          <Text style={styles.subscriptionDrilldownAmountMeta}>
+            {isFrench ? "/ mois" : "/ month"}
+          </Text>
         </View>
       </View>
       {chips?.length ? (
@@ -603,6 +673,8 @@ function CategoryPodium({
   currency: string;
 }): JSX.Element {
   const styles = createStyles(useAppTheme());
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const podiumOrder = [categories[1], categories[0], categories[2]].filter(Boolean) as RankedCategory[];
 
   return (
@@ -626,11 +698,15 @@ function CategoryPodium({
           <Text numberOfLines={1} style={styles.podiumTitle}>
             {category.categoryName}
           </Text>
-          <Text style={styles.podiumMeta}>{category.subscriptionCount} abonnement(s)</Text>
+          <Text style={styles.podiumMeta}>
+            {isFrench
+              ? `${category.subscriptionCount} abonnement(s)`
+              : `${category.subscriptionCount} subscription(s)`}
+          </Text>
           <Text style={styles.podiumAmount}>
             {formatCurrency(category.amountMonthly, currency)}
           </Text>
-          <Text style={styles.podiumAmountMeta}>/ mois</Text>
+          <Text style={styles.podiumAmountMeta}>{isFrench ? "/ mois" : "/ month"}</Text>
         </View>
       ))}
     </View>
@@ -648,9 +724,11 @@ function CategoryDonutChart({
 }): JSX.Element {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale, t } = useAppTranslation();
+  const isFrench = locale === "fr";
 
   if (data.length === 0) {
-    return <EmptyState message="Ajoute quelques abonnements pour voir le camembert par categorie." />;
+    return <EmptyState message={t("statistics.emptyPie")} />;
   }
 
   const segmentCount = 72;
@@ -712,7 +790,9 @@ function CategoryDonutChart({
               compact ? styles.donutCenterCompact : null
             ]}
           >
-            <Text style={styles.donutCenterLabel}>Total mensuel</Text>
+            <Text style={styles.donutCenterLabel}>
+              {isFrench ? "Total mensuel" : "Monthly total"}
+            </Text>
             <Text style={styles.donutCenterValue}>{formatCurrency(total, currency)}</Text>
           </View>
         </View>
@@ -747,9 +827,10 @@ function CategoryBarChart({
   compact: boolean;
 }): JSX.Element {
   const styles = createStyles(useAppTheme());
+  const { t } = useAppTranslation();
 
   if (data.length === 0) {
-    return <EmptyState message="Ajoute quelques abonnements pour activer le graphique en barres." />;
+    return <EmptyState message={t("statistics.emptyBar")} />;
   }
 
   const maxAmount = Math.max(...data.map((item) => item.amountMonthly), 1);
@@ -802,10 +883,11 @@ function MonthlyTrendChart({
   compact: boolean;
 }): JSX.Element {
   const styles = createStyles(useAppTheme());
+  const { t } = useAppTranslation();
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
 
   if (data.length === 0) {
-    return <EmptyState message="L'evolution mensuelle apparaitra ici des que tu auras de l'historique." />;
+    return <EmptyState message={t("statistics.emptyTrend")} />;
   }
 
   const chartPaddingX = 16;
@@ -922,30 +1004,40 @@ function shrinkLabel(value: string) {
   return firstWord.length > 8 ? `${firstWord.slice(0, 7)}.` : firstWord;
 }
 
-function buildLowUtilitySubtitle(subscription: Subscription) {
+function buildLowUtilitySubtitle(subscription: Subscription, isFrench: boolean) {
   if (subscription.lastUsedAt) {
-    return `derniere activite le ${formatLongDate(subscription.lastUsedAt)}`;
+    return isFrench
+      ? `derniere activite le ${formatLongDate(subscription.lastUsedAt)}`
+      : `last activity on ${formatLongDate(subscription.lastUsedAt)}`;
   }
 
   return formatUsageCheckIn(subscription.usageCheckIn);
 }
 
-function describeLowUtilityReason(reason: LowUtilityReason, lastUsedAt: string | null) {
+function describeLowUtilityReason(
+  reason: LowUtilityReason,
+  lastUsedAt: string | null,
+  isFrench: boolean
+) {
   if (reason === "unused") {
-    return "Usage signale comme faible";
+    return isFrench ? "Usage signale comme faible" : "Marked as low usage";
   }
 
   if (reason === "stale") {
     return lastUsedAt
-      ? `Inactif depuis le ${formatLongDate(lastUsedAt)}`
-      : "Pas d'activite recente";
+      ? isFrench
+        ? `Inactif depuis le ${formatLongDate(lastUsedAt)}`
+        : `Inactive since ${formatLongDate(lastUsedAt)}`
+      : isFrench
+        ? "Pas d'activite recente"
+        : "No recent activity";
   }
 
   if (reason === "duplicate_provider") {
-    return "Doublon de service possible";
+    return isFrench ? "Doublon de service possible" : "Possible duplicate service";
   }
 
-  return "Categorie deja surchargee";
+  return isFrench ? "Categorie deja surchargee" : "Category already overloaded";
 }
 
 function getLowUtilitySubscriptions(subscriptions: Subscription[]): LowUtilityItem[] {
@@ -1631,6 +1723,11 @@ const createStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
     color: theme.colors.textSecondary
+  },
+  headerActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
   },
   headerIconButton: {
     width: 48,

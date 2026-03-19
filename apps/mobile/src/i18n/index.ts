@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
-type TextLocale = "fr" | "en" | "de" | "ar" | "ru" | "tr" | "zh" | "ja";
+import { getAppLanguageOption, type SupportedAppLocale } from "../constants/appLanguages";
+
+type TextLocale = SupportedAppLocale;
 
 type TranslationKey =
   | "common.back"
@@ -113,6 +115,15 @@ type TranslationKey =
   | "settings.select"
   | "settings.noLanguageFoundTitle"
   | "settings.noLanguageFoundBody"
+  | "settings.notificationsEnabled"
+  | "settings.notificationCenter"
+  | "settings.notificationCenterBody"
+  | "notifications.title"
+  | "notifications.subtitle"
+  | "notifications.alertsSection"
+  | "notifications.upcomingSection"
+  | "notifications.emptyTitle"
+  | "notifications.emptyBody"
   | "format.billing.weekly"
   | "format.billing.monthly"
   | "format.billing.quarterly"
@@ -130,7 +141,10 @@ type TranslationKey =
   | "format.insight.unused"
   | "format.insight.duplicate"
   | "format.insight.paymentDue"
-  | "format.insight.default";
+  | "format.insight.default"
+  | "format.insightBody.unused"
+  | "format.insightBody.duplicate"
+  | "format.insightBody.default";
 
 type TranslationMap = Record<TranslationKey, string>;
 
@@ -245,6 +259,15 @@ const frenchTranslations: TranslationMap = {
   "settings.select": "Selectionner",
   "settings.noLanguageFoundTitle": "Aucune langue trouvee",
   "settings.noLanguageFoundBody": "Essaie un autre mot-cle pour retrouver la langue que tu cherches.",
+  "settings.notificationsEnabled": "Notifications",
+  "settings.notificationCenter": "Centre de notifications",
+  "settings.notificationCenterBody": "Retrouve ici les alertes utiles et les paiements a venir.",
+  "notifications.title": "Notifications",
+  "notifications.subtitle": "Toutes tes alertes utiles et tes paiements a venir au meme endroit.",
+  "notifications.alertsSection": "Alertes utiles",
+  "notifications.upcomingSection": "Paiements a venir",
+  "notifications.emptyTitle": "Aucune notification",
+  "notifications.emptyBody": "Quand Subly detectera un rappel ou une alerte utile, tout apparaitra ici.",
   "format.billing.weekly": "Hebdomadaire",
   "format.billing.monthly": "Mensuel",
   "format.billing.quarterly": "Trimestriel",
@@ -262,7 +285,10 @@ const frenchTranslations: TranslationMap = {
   "format.insight.unused": "Abonnement a surveiller",
   "format.insight.duplicate": "Doublon detecte",
   "format.insight.paymentDue": "Paiement a venir",
-  "format.insight.default": "Alerte Subly"
+  "format.insight.default": "Alerte Subly",
+  "format.insightBody.unused": "{providerName} semble inactif depuis un moment.",
+  "format.insightBody.duplicate": "Tu as {count} abonnements actifs pour {providerName}.",
+  "format.insightBody.default": "Une alerte merite ton attention."
 };
 
 const englishTranslations: TranslationMap = {
@@ -376,6 +402,15 @@ const englishTranslations: TranslationMap = {
   "settings.select": "Select",
   "settings.noLanguageFoundTitle": "No language found",
   "settings.noLanguageFoundBody": "Try another keyword to find the language you want.",
+  "settings.notificationsEnabled": "Notifications",
+  "settings.notificationCenter": "Notification center",
+  "settings.notificationCenterBody": "See useful alerts and upcoming payments in one place.",
+  "notifications.title": "Notifications",
+  "notifications.subtitle": "All your useful alerts and upcoming payments in one place.",
+  "notifications.alertsSection": "Helpful alerts",
+  "notifications.upcomingSection": "Upcoming payments",
+  "notifications.emptyTitle": "No notifications",
+  "notifications.emptyBody": "When Subly detects a reminder or a useful alert, it will appear here.",
   "format.billing.weekly": "Weekly",
   "format.billing.monthly": "Monthly",
   "format.billing.quarterly": "Quarterly",
@@ -393,7 +428,10 @@ const englishTranslations: TranslationMap = {
   "format.insight.unused": "Subscription to watch",
   "format.insight.duplicate": "Duplicate detected",
   "format.insight.paymentDue": "Payment due soon",
-  "format.insight.default": "Subly alert"
+  "format.insight.default": "Subly alert",
+  "format.insightBody.unused": "{providerName} seems inactive lately.",
+  "format.insightBody.duplicate": "You have {count} active subscriptions for {providerName}.",
+  "format.insightBody.default": "An alert needs your attention."
 };
 
 const translations: Record<TextLocale, Partial<TranslationMap>> = {
@@ -497,17 +535,51 @@ const translations: Record<TextLocale, Partial<TranslationMap>> = {
   }
 };
 
-let activeTextLocale: TextLocale = "fr";
-let activeFormatLocale = "fr-FR";
+type I18nState = {
+  textLocale: TextLocale;
+  formatLocale: string;
+};
 
-export function setActiveLanguage() {
-  activeTextLocale = "fr";
-  activeFormatLocale = "fr-FR";
+let activeState: I18nState = {
+  textLocale: "fr",
+  formatLocale: "fr-FR"
+};
+
+const listeners = new Set<() => void>();
+
+function getSnapshot() {
+  return activeState;
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function setActiveLanguage(language?: string | null) {
+  const option = getAppLanguageOption(language);
+  const nextState: I18nState = {
+    textLocale: option.textLocale,
+    formatLocale: option.formatLocale
+  };
+
+  if (
+    nextState.textLocale === activeState.textLocale &&
+    nextState.formatLocale === activeState.formatLocale
+  ) {
+    return;
+  }
+
+  activeState = nextState;
+  listeners.forEach((listener) => listener());
 }
 
 export function translate(key: TranslationKey, params?: Record<string, string | number>): string {
   const template =
-    translations[activeTextLocale][key] ??
+    translations[activeState.textLocale][key] ??
     translations.en[key] ??
     frenchTranslations[key];
 
@@ -515,17 +587,24 @@ export function translate(key: TranslationKey, params?: Record<string, string | 
 }
 
 export function getActiveFormatLocale(): string {
-  return activeFormatLocale;
+  return activeState.formatLocale;
 }
 
 export function useAppTranslation() {
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+
   return useMemo(() => {
     return {
-      locale: "fr" as const,
+      locale: snapshot.textLocale,
       t: (key: TranslationKey, params?: Record<string, string | number>) =>
-        interpolate(frenchTranslations[key], params)
+        interpolate(
+          translations[snapshot.textLocale][key] ??
+            translations.en[key] ??
+            frenchTranslations[key],
+          params
+        )
     };
-  }, []);
+  }, [snapshot.textLocale]);
 }
 
 function interpolate(template: string, params?: Record<string, string | number>): string {

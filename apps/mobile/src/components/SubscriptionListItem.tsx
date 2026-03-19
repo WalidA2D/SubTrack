@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Subscription } from "@subly/shared";
 
+import { useAppTranslation } from "../i18n";
 import { ServiceLogo } from "./ServiceLogo";
 import { AppTheme, radius, shadows, spacing, useAppTheme } from "../theme";
 import { formatBillingFrequency, formatCurrency, formatShortDate } from "../utils/format";
@@ -42,6 +43,8 @@ export function SubscriptionListItem({
   const isCompact = width < 380;
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const { locale } = useAppTranslation();
+  const isFrench = locale === "fr";
   const lastLongPressAtRef = useRef(0);
   const canArchive = Boolean(onArchive) && !isArchiving && !isIncludedLink;
   const cardStyles = [
@@ -65,15 +68,25 @@ export function SubscriptionListItem({
   const primaryLinkedParent = linkedParentSubscriptions?.[0] ?? null;
   const linkedParentText = linkedParentProviderNames?.join(", ") ?? "";
   const sublineText = isIncludedLink
-    ? `Inclus via ${linkedParentText || "un autre abonnement"}`
+    ? isFrench
+      ? `Inclus via ${linkedParentText || "un autre abonnement"}`
+      : `Included via ${linkedParentText || "another subscription"}`
     : `${subscription.categoryName} - ${formatShortDate(subscription.nextBillingDate)}`;
   const linkedLabelText =
-    !isIncludedLink && linkedParentText ? `Lie a ${linkedParentText}` : null;
+    !isIncludedLink && linkedParentText
+      ? isFrench
+        ? `Lie a ${linkedParentText}`
+        : `Linked to ${linkedParentText}`
+      : null;
   const trailingPriceText = isIncludedLink
-    ? "Inclus"
+    ? isFrench
+      ? "Inclus"
+      : "Included"
     : formatCurrency(subscription.price, subscription.currency);
   const trailingMetaText = isIncludedLink
-    ? "Service lie"
+    ? isFrench
+      ? "Service lie"
+      : "Linked service"
     : formatBillingFrequency(subscription.billingFrequency);
 
   const handleCardPress = () => {
@@ -91,11 +104,13 @@ export function SubscriptionListItem({
 
     lastLongPressAtRef.current = Date.now();
     Alert.alert(
-      "Archiver l'abonnement ?",
-      `Veux-tu archiver ${subscription.providerName} ?`,
+      isFrench ? "Archiver l'abonnement ?" : "Archive subscription?",
+      isFrench
+        ? `Veux-tu archiver ${subscription.providerName} ?`
+        : `Do you want to archive ${subscription.providerName}?`,
       [
         {
-          text: "Non",
+          text: isFrench ? "Non" : "No",
           style: "cancel"
         },
         {

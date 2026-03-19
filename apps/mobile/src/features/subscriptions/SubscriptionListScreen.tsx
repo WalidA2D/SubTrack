@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SubscriptionStatus } from "@subly/shared";
 
 import { PrimaryButton } from "../../components/PrimaryButton";
@@ -10,7 +10,7 @@ import { isPremiumPlan } from "../../constants/premium";
 import { useAppTranslation } from "../../i18n";
 import { useAppNavigation } from "../../store/navigationStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
-import { AppTheme, radius, spacing, useAppTheme } from "../../theme";
+import { AppTheme, radius, shadows, spacing, useAppTheme } from "../../theme";
 import {
   buildSubscriptionDisplayEntries,
   sortSubscriptionDisplayEntries
@@ -50,8 +50,9 @@ const LINK_FILTERS: Array<{ id: LinkFilter; label: string }> = [
 export function SubscriptionListScreen(): JSX.Element {
   const navigation = useAppNavigation();
   const theme = useAppTheme();
-  const { t } = useAppTranslation();
+  const { locale, t } = useAppTranslation();
   const styles = createStyles(theme);
+  const isFrench = locale === "fr";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortOption, setSortOption] = useState<SortOption>("next_billing");
@@ -65,6 +66,63 @@ export function SubscriptionListScreen(): JSX.Element {
   const isLoading = useWorkspaceStore((state) => state.isLoading);
   const archiveSubscription = useWorkspaceStore((state) => state.archiveSubscription);
   const currency = profile?.currency ?? "EUR";
+  const statusFilters = [
+    { id: "all" as const, label: isFrench ? "Tous" : "All" },
+    { id: "active" as const, label: isFrench ? "Actifs" : "Active" },
+    { id: "trial" as const, label: isFrench ? "Essais" : "Trials" },
+    { id: "cancelled" as const, label: isFrench ? "Annules" : "Cancelled" }
+  ];
+  const sortOptions = [
+    { id: "next_billing" as const, label: isFrench ? "Proche" : "Soonest" },
+    { id: "price_desc" as const, label: isFrench ? "Prix decroissant" : "Highest price" },
+    { id: "price_asc" as const, label: isFrench ? "Prix croissant" : "Lowest price" },
+    { id: "provider" as const, label: "A-Z" }
+  ];
+  const linkFilters = [
+    { id: "primary" as const, label: isFrench ? "Principaux" : "Primary" },
+    { id: "included" as const, label: isFrench ? "Inclus" : "Included" },
+    { id: "all" as const, label: isFrench ? "Tous" : "All" }
+  ];
+  const copy = {
+    subtitle: isFrench
+      ? "Trie, filtre et regroupe tes abonnements pour reperer plus vite ce qui merite une action."
+      : "Sort, filter and group your subscriptions to spot faster what needs action.",
+    portfolio: isFrench ? "Portefeuille" : "Portfolio",
+    visibleSubscriptions: isFrench ? "abonnement(s) visibles" : "visible subscription(s)",
+    currentSelection: isFrench ? "sur la selection courante" : "on the current selection",
+    toWatch: isFrench ? "A surveiller" : "To watch",
+    inNextDays: isFrench
+      ? `dans les ${DUE_SOON_DAYS} prochains jours`
+      : `in the next ${DUE_SOON_DAYS} days`,
+    trials: isFrench ? "Essais" : "Trials",
+    stillActive: isFrench ? "encore actifs" : "still active",
+    freePlan: isFrench ? "Plan gratuit" : "Free plan",
+    sponsoredCard: isFrench ? "Carte sponsorisee" : "Sponsored card",
+    sponsoredBody: isFrench
+      ? "Le plan gratuit peut afficher des cartes sponsorisees dans les vues de pilotage. Le Premium retire ces emplacements."
+      : "The free plan may display sponsored cards in management views. Premium removes them.",
+    goPremium: isFrench ? "Passer au Premium" : "Go Premium",
+    exportPdf: isFrench ? "Exporter PDF" : "Export PDF",
+    exportHint: isFrench
+      ? "Rapport premium filtre et propre"
+      : "Filtered premium report",
+    premiumTitle: isFrench ? "Disponible avec Premium" : "Available with Premium",
+    premiumLater: isFrench ? "Plus tard" : "Later",
+    viewPremium: isFrench ? "Voir Premium" : "See Premium",
+    exportFeature: isFrench ? "L'export PDF des abonnements" : "PDF export for subscriptions",
+    display: isFrench ? "Affichage" : "Display",
+    status: isFrench ? "Statut" : "Status",
+    sort: isFrench ? "Tri" : "Sort",
+    category: isFrench ? "Categorie" : "Category",
+    reset: isFrench ? "Reinitialiser" : "Reset",
+    allCategories: isFrench ? "Toutes" : "All",
+    organizedView: isFrench ? "Vue organisee" : "Organized view",
+    sortLabel: isFrench ? "Tri" : "Sort",
+    filterHint: isFrench
+      ? "Essaie un autre filtre ou reinitialise la selection courante."
+      : "Try another filter or reset the current selection.",
+    resetFilters: isFrench ? "Reinitialiser les filtres" : "Reset filters"
+  };
 
   const subscriptionEntries = useMemo(
     () => sortSubscriptionDisplayEntries(buildSubscriptionDisplayEntries(subscriptions)),
@@ -130,7 +188,8 @@ export function SubscriptionListScreen(): JSX.Element {
     categoryFilter !== "all" ||
     linkFilter !== "primary";
   const activeSortLabel =
-    SORT_OPTIONS.find((option) => option.id === sortOption)?.label ?? "Proche";
+    sortOptions.find((option) => option.id === sortOption)?.label ??
+    (isFrench ? "Proche" : "Soonest");
   const dueSoonCount = filteredSubscriptions.filter(
     (entry) =>
       !hasParentLink(entry) &&
@@ -144,8 +203,8 @@ export function SubscriptionListScreen(): JSX.Element {
     0
   );
   const sections = useMemo(
-    () => buildSections(filteredSubscriptions, statusFilter, linkFilter),
-    [filteredSubscriptions, linkFilter, statusFilter]
+    () => buildSections(filteredSubscriptions, statusFilter, linkFilter, isFrench),
+    [filteredSubscriptions, isFrench, linkFilter, statusFilter]
   );
 
   const handleArchiveSubscription = async (subscriptionId: string) => {
@@ -166,6 +225,24 @@ export function SubscriptionListScreen(): JSX.Element {
     }
   };
 
+  const handleOpenPdfExport = () => {
+    if (isPremium) {
+      navigation.navigate("SubscriptionPdfExport");
+      return;
+    }
+
+    Alert.alert(copy.premiumTitle, `${copy.exportFeature} ${isFrench ? "fait partie des avantages Premium." : "is part of Premium benefits."}`, [
+      {
+        text: copy.premiumLater,
+        style: "cancel"
+      },
+      {
+        text: copy.viewPremium,
+        onPress: () => navigation.navigate("Profile")
+      }
+    ]);
+  };
+
   const resetFilters = () => {
     setSearch("");
     setStatusFilter("all");
@@ -177,41 +254,41 @@ export function SubscriptionListScreen(): JSX.Element {
   return (
     <Screen
       title={t("subscriptions.title")}
-      subtitle="Trie, filtre et regroupe tes abonnements pour reperer plus vite ce qui merite une action."
+      subtitle={copy.subtitle}
       action={<PrimaryButton title={t("common.back")} onPress={navigation.goBack} variant="secondary" />}
     >
       <View style={styles.heroRow}>
         <View style={styles.heroMetric}>
-          <Text style={styles.heroLabel}>Portefeuille</Text>
+          <Text style={styles.heroLabel}>{copy.portfolio}</Text>
           <Text style={styles.heroValue}>{filteredSubscriptions.length}</Text>
-          <Text style={styles.heroMeta}>abonnement(s) visibles</Text>
+          <Text style={styles.heroMeta}>{copy.visibleSubscriptions}</Text>
         </View>
         <View style={styles.heroMetric}>
           <Text style={styles.heroLabel}>{t("subscriptions.monthly")}</Text>
           <Text style={styles.heroValue}>{formatCurrency(monthlyTotal, currency)}</Text>
-          <Text style={styles.heroMeta}>sur la selection courante</Text>
+          <Text style={styles.heroMeta}>{copy.currentSelection}</Text>
         </View>
       </View>
 
       <View style={styles.heroRow}>
         <View style={styles.heroMetricMuted}>
-          <Text style={styles.heroLabel}>A surveiller</Text>
+          <Text style={styles.heroLabel}>{copy.toWatch}</Text>
           <Text style={styles.heroValueCompact}>{dueSoonCount}</Text>
-          <Text style={styles.heroMeta}>dans les {DUE_SOON_DAYS} prochains jours</Text>
+          <Text style={styles.heroMeta}>{copy.inNextDays}</Text>
         </View>
         <View style={styles.heroMetricMuted}>
-          <Text style={styles.heroLabel}>Essais</Text>
+          <Text style={styles.heroLabel}>{copy.trials}</Text>
           <Text style={styles.heroValueCompact}>{trialCount}</Text>
-          <Text style={styles.heroMeta}>encore actifs</Text>
+          <Text style={styles.heroMeta}>{copy.stillActive}</Text>
         </View>
       </View>
 
       {!isPremium ? (
         <PromoCard
-          eyebrow="Plan gratuit"
-          title="Carte sponsorisee"
-          body="Le plan gratuit peut afficher des cartes sponsorisees dans les vues de pilotage. Le Premium retire ces emplacements."
-          ctaLabel="Passer au Premium"
+          eyebrow={copy.freePlan}
+          title={copy.sponsoredCard}
+          body={copy.sponsoredBody}
+          ctaLabel={copy.goPremium}
           onPress={() => navigation.navigate("Profile")}
         />
       ) : null}
@@ -229,14 +306,21 @@ export function SubscriptionListScreen(): JSX.Element {
         </Pressable>
       </View>
 
+      <View style={styles.exportRow}>
+        <Pressable style={styles.exportButton} onPress={handleOpenPdfExport}>
+          <Text style={styles.exportButtonLabel}>{copy.exportPdf}</Text>
+          <Text style={styles.exportButtonHint}>{copy.exportHint}</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.filterBlock}>
-        <Text style={styles.filterTitle}>Affichage</Text>
+        <Text style={styles.filterTitle}>{copy.display}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          {LINK_FILTERS.map((option) => {
+          {linkFilters.map((option) => {
             const isActive = linkFilter === option.id;
 
             return (
@@ -260,13 +344,13 @@ export function SubscriptionListScreen(): JSX.Element {
       </View>
 
       <View style={styles.filterBlock}>
-        <Text style={styles.filterTitle}>Statut</Text>
+        <Text style={styles.filterTitle}>{copy.status}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          {STATUS_FILTERS.map((option) => {
+          {statusFilters.map((option) => {
             const isActive = statusFilter === option.id;
 
             return (
@@ -290,13 +374,13 @@ export function SubscriptionListScreen(): JSX.Element {
       </View>
 
       <View style={styles.filterBlock}>
-        <Text style={styles.filterTitle}>Tri</Text>
+        <Text style={styles.filterTitle}>{copy.sort}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          {SORT_OPTIONS.map((option) => {
+          {sortOptions.map((option) => {
             const isActive = sortOption === option.id;
 
             return (
@@ -321,10 +405,10 @@ export function SubscriptionListScreen(): JSX.Element {
 
       <View style={styles.filterBlock}>
         <View style={styles.filterHeader}>
-          <Text style={styles.filterTitle}>Categorie</Text>
+          <Text style={styles.filterTitle}>{copy.category}</Text>
           {hasActiveFilters ? (
             <Pressable onPress={resetFilters}>
-              <Text style={styles.clearFilters}>Reinitialiser</Text>
+              <Text style={styles.clearFilters}>{copy.reset}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -335,7 +419,7 @@ export function SubscriptionListScreen(): JSX.Element {
         >
           {categoryOptions.map((option) => {
             const isActive = categoryFilter === option;
-            const label = option === "all" ? "Toutes" : option;
+            const label = option === "all" ? copy.allCategories : option;
 
             return (
               <Pressable
@@ -358,8 +442,8 @@ export function SubscriptionListScreen(): JSX.Element {
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Vue organisee</Text>
-        <Text style={styles.sectionMeta}>Tri : {activeSortLabel}</Text>
+        <Text style={styles.sectionTitle}>{copy.organizedView}</Text>
+        <Text style={styles.sectionMeta}>{copy.sortLabel} : {activeSortLabel}</Text>
       </View>
 
       <View style={styles.list}>
@@ -370,11 +454,11 @@ export function SubscriptionListScreen(): JSX.Element {
             </Text>
             <Text style={styles.emptyBody}>
               {hasActiveFilters
-                ? "Essaie un autre filtre ou reinitialise la selection courante."
+                ? copy.filterHint
                 : t("subscriptions.tryOther")}
             </Text>
             {hasActiveFilters ? (
-              <PrimaryButton title="Reinitialiser les filtres" onPress={resetFilters} variant="secondary" />
+              <PrimaryButton title={copy.resetFilters} onPress={resetFilters} variant="secondary" />
             ) : null}
           </View>
         ) : (
@@ -422,7 +506,8 @@ export function SubscriptionListScreen(): JSX.Element {
 function buildSections(
   entries: DisplayEntry[],
   statusFilter: StatusFilter,
-  linkFilter: LinkFilter
+  linkFilter: LinkFilter,
+  isFrench: boolean
 ): ListSection[] {
   const includedEntries = entries.filter((entry) => hasParentLink(entry));
   const primaryEntries = entries.filter((entry) => !hasParentLink(entry));
@@ -431,8 +516,10 @@ function buildSections(
     return [
       {
         key: "included",
-        title: "Abonnements inclus",
-        subtitle: `${includedEntries.length} abonnement(s) relies a une offre principale`,
+        title: isFrench ? "Abonnements inclus" : "Included subscriptions",
+        subtitle: isFrench
+          ? `${includedEntries.length} abonnement(s) relies a une offre principale`
+          : `${includedEntries.length} subscription(s) linked to a main offer`,
         entries: includedEntries
       }
     ];
@@ -441,8 +528,10 @@ function buildSections(
   if (statusFilter === "trial") {
     const trialSection: ListSection = {
       key: "trial",
-      title: "Essais gratuits",
-      subtitle: `${entries.length} abonnement(s) en cours de conversion`,
+      title: isFrench ? "Essais gratuits" : "Free trials",
+      subtitle: isFrench
+        ? `${entries.length} abonnement(s) en cours de conversion`
+        : `${entries.length} subscription(s) in conversion`,
       entries
     };
 
@@ -457,8 +546,10 @@ function buildSections(
       },
       {
         key: "included_trial",
-        title: "Inclus relies",
-        subtitle: `${includedEntries.length} abonnement(s) rattaches a une autre offre`,
+        title: isFrench ? "Inclus relies" : "Linked included services",
+        subtitle: isFrench
+          ? `${includedEntries.length} abonnement(s) rattaches a une autre offre`
+          : `${includedEntries.length} subscription(s) attached to another offer`,
         entries: includedEntries
       }
     ].filter((section) => section.entries.length > 0);
@@ -467,8 +558,10 @@ function buildSections(
   if (statusFilter === "cancelled") {
     const cancelledSection: ListSection = {
       key: "cancelled",
-      title: "Abonnements annules",
-      subtitle: `${entries.length} abonnement(s) conserves pour suivi`,
+      title: isFrench ? "Abonnements annules" : "Cancelled subscriptions",
+      subtitle: isFrench
+        ? `${entries.length} abonnement(s) conserves pour suivi`
+        : `${entries.length} subscription(s) kept for tracking`,
       entries
     };
 
@@ -483,8 +576,10 @@ function buildSections(
       },
       {
         key: "included_cancelled",
-        title: "Inclus relies",
-        subtitle: `${includedEntries.length} abonnement(s) rattaches a une autre offre`,
+        title: isFrench ? "Inclus relies" : "Linked included services",
+        subtitle: isFrench
+          ? `${includedEntries.length} abonnement(s) rattaches a une autre offre`
+          : `${includedEntries.length} subscription(s) attached to another offer`,
         entries: includedEntries
       }
     ].filter((section) => section.entries.length > 0);
@@ -502,20 +597,26 @@ function buildSections(
   const sections: ListSection[] = [
     {
       key: "due_soon",
-      title: "A payer bientot",
-      subtitle: `${dueSoonEntries.length} abonnement(s) dans les ${DUE_SOON_DAYS} jours`,
+      title: isFrench ? "A payer bientot" : "Pay soon",
+      subtitle: isFrench
+        ? `${dueSoonEntries.length} abonnement(s) dans les ${DUE_SOON_DAYS} jours`
+        : `${dueSoonEntries.length} subscription(s) within ${DUE_SOON_DAYS} days`,
       entries: dueSoonEntries
     },
     {
       key: "trial",
-      title: "Essais gratuits",
-      subtitle: `${trialEntries.length} abonnement(s) a confirmer`,
+      title: isFrench ? "Essais gratuits" : "Free trials",
+      subtitle: isFrench
+        ? `${trialEntries.length} abonnement(s) a confirmer`
+        : `${trialEntries.length} subscription(s) to confirm`,
       entries: trialEntries
     },
     {
       key: "other",
-      title: "Reste du portefeuille",
-      subtitle: `${remainingEntries.length} abonnement(s) classes`,
+      title: isFrench ? "Reste du portefeuille" : "Rest of portfolio",
+      subtitle: isFrench
+        ? `${remainingEntries.length} abonnement(s) classes`
+        : `${remainingEntries.length} subscription(s) sorted`,
       entries: remainingEntries
     }
   ];
@@ -523,8 +624,10 @@ function buildSections(
   if (linkFilter === "all" && includedEntries.length > 0) {
     sections.push({
       key: "included",
-      title: "Abonnements inclus",
-      subtitle: `${includedEntries.length} abonnement(s) relies a une autre offre`,
+      title: isFrench ? "Abonnements inclus" : "Included subscriptions",
+      subtitle: isFrench
+        ? `${includedEntries.length} abonnement(s) relies a une autre offre`
+        : `${includedEntries.length} subscription(s) linked to another offer`,
       entries: includedEntries
     });
   }
@@ -593,6 +696,9 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: "row",
       gap: spacing.sm
     },
+    exportRow: {
+      alignItems: "flex-end"
+    },
     search: {
       flex: 1,
       minHeight: 54,
@@ -619,6 +725,28 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 14,
       fontWeight: "800",
       color: "#241602"
+    },
+    exportButton: {
+      minHeight: 48,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: 18,
+      alignItems: "flex-start",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: theme.colors.borderStrong,
+      ...shadows.card
+    },
+    exportButtonLabel: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.colors.textPrimary
+    },
+    exportButtonHint: {
+      marginTop: 2,
+      fontSize: 11,
+      color: theme.colors.textSecondary
     },
     filterBlock: {
       gap: spacing.sm

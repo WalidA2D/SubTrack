@@ -7,8 +7,10 @@ type OverlayName =
   | "AddSubscription"
   | "BubbleGallery"
   | "Subscriptions"
+  | "SubscriptionPdfExport"
   | "SubscriptionDetails"
   | "StatisticsCalendar"
+  | "NotificationCenter"
   | "Profile"
   | "Settings"
   | "LegalDocument";
@@ -27,12 +29,20 @@ type OverlayRoute =
       params?: RootStackParamList["Subscriptions"];
     }
   | {
+      name: "SubscriptionPdfExport";
+      params?: RootStackParamList["SubscriptionPdfExport"];
+    }
+  | {
       name: "SubscriptionDetails";
       params: RootStackParamList["SubscriptionDetails"];
     }
   | {
       name: "StatisticsCalendar";
       params?: RootStackParamList["StatisticsCalendar"];
+    }
+  | {
+      name: "NotificationCenter";
+      params?: RootStackParamList["NotificationCenter"];
     }
   | {
       name: "Profile";
